@@ -1,38 +1,426 @@
 <!DOCTYPE html>
-   <html lang="en">
-   <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<html lang="nl">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Derde-betalersysteem</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet"/>
+  <style>
+    body { font-family: "Arial Narrow", Arial, sans-serif; font-weight: bold; font-stretch: condensed; }
+    h1, h2, h3, .cta-button { font-family: Arial, sans-serif; font-weight: bold; }
+    .stib-blue { color:#0077C0; } .text-black { color:#202022; } .bg-stib-blue { background-color:#0077C0; }
+    .stib-green-700 { color:#007762; } .bg-stib-light-green { background-color:#E0F8F4; } .stib-dark-green { color:#007762; }
+    .page-margins { margin:0 2rem; } @media(min-width:768px){ .page-margins { margin:0 4rem; } }
+    .footer-section { border-top:1px solid #E5E7EB; padding-top:1rem; }
+    .language-option .icon-circle,.language-option .icon-check { display:none; }
+    .language-option:not(.active):hover { color:#0077C0!important; }
+    .language-option:not(.active):hover .icon-circle { display:block; }
+    .language-option.active { color:#0077C0!important; }
+    .language-option.active .icon-check { display:block; }
+    .language-option.active:hover .icon-circle { display:none; }
+  </style>
+</head>
+<body class="bg-white">
+  <!-- Header -->
+  <header class="p-4">
+    <div class="container mx-auto flex justify-between items-center">
+      <!-- Logo linked to STIB-MIVB -->
+      <a href="https://www.stib-mivb.be/bedrijven" aria-label="STIB-MIVB — Bedrijven">
+        <img
+          alt="Logo MIVB"
+          class="h-16"
+          src="http://image.info.stib-mivb.brussels/lib/fe4015707564057e7d1472/m/1/a858a944-c241-46a0-bb30-8598fa6087e3.png"
+          decoding="async"
+        />
+      </a>
 
-      <!--=============== FAVICON ===============-->
-      <link rel="shortcut icon" href="assets/img/favicon.png" type="image/x-icon">
+      <div class="relative">
+        <button id="languageDropdown"
+                class="flex items-center px-4 py-2 border-2 rounded-full text-sm font-medium cta-button focus:outline-none focus:ring-2 focus:ring-offset-2"
+                style="border-color:#0077C0;color:#0077C0;--tw-ring-color:#0077C0;">
+          <span id="selectedLanguage">Nederlands</span>
+          <svg class="ml-2 h-4 w-4 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+          </svg>
+        </button>
+        <div id="languageMenu" class="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50 hidden">
+          <div class="py-2">
+            <button class="language-option w-full px-4 py-2 text-left text-sm flex items-center justify-between" data-lang="en" data-url="https://cloud.info.stib-mivb.brussels/ThirdPartySystem">
+              <span class="option-label">English</span>
+              <svg class="icon-circle h-4 w-4" fill="none" stroke="#0077C0" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke-width="2"/></svg>
+              <svg class="icon-check h-4 w-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            </button>
+            <button class="language-option w-full px-4 py-2 text-left text-sm flex items-center justify-between" data-lang="fr" data-url="https://cloud.info.stib-mivb.brussels/SystemeTiersPayant">
+              <span class="option-label">Français</span>
+              <svg class="icon-circle h-4 w-4" fill="none" stroke="#0077C0" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke-width="2"/></svg>
+              <svg class="icon-check h-4 w-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            </button>
+            <button class="language-option active w-full px-4 py-2 text-left text-sm flex items-center justify-between" data-lang="nl">
+              <span class="option-label">Nederlands</span>
+              <svg class="icon-circle h-4 w-4" fill="none" stroke="#0077C0" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke-width="2"/></svg>
+              <svg class="icon-check h-4 w-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
 
-      <!--=============== REMIXICONS ===============-->
-      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/remixicon/3.5.0/remixicon.css" crossorigin="">
+  <main>
+    <!-- Hero -->
+    <div class="relative">
+      <img alt="People inside a public transport vehicle" class="w-full h-auto"
+           src="https://image.info.stib-mivb.brussels/lib/fe4015707564057e7d1472/m/1/5748d621-aaec-4ff7-a17c-05e213334f7f.jpg"/>
+    </div>
 
-      <!--=============== CSS ===============-->
-      <link rel="stylesheet" href="assets/css/styles.css">
+    <section class="py-12 text-center page-margins">
+      <div class="container mx-auto px-4">
+        <h1 class="text-3xl mb-4 stib-blue">100% flexibele mobiliteit, een win-win voor medewerkers en onderneming</h1>
+        <p class="text-lg max-w-4xl mx-auto text-black">
+          Bied jouw werknemers de mogelijkheid om zich overal in Brussel te verplaatsen, maar ook vanuit een deel van de gemeenten van Vlaams-Brabant dankzij de Brupass XL.
+        </p>
+      </div>
+    </section>
 
-      <title>Responsive space website - Bedimcode</title>
-   </head>
-   <body>
-      <!--==================== HEADER ====================-->
-      <header class="header" id="header">
-         
-      </header>
-
-      <!--==================== MAIN ====================-->
-      <main class="main">
-         <!--==================== HOME ====================-->
-         <section class="home">
+    <!-- Form Section -->
+    <section class="page-margins">
+      <!-- Success Message -->
+      <div id="successMessage" class="hidden container mx-auto px-6 text-center max-w-4xl">
+        <div class="bg-stib-light-green stib-green-700 px-6 py-4 rounded-lg flex items-center justify-center space-x-4 mb-8">
+          <span class="material-icons stib-green-700 text-3xl">check_circle</span>
+          <p>Bedankt! Wij contacteren je binnenkort met meer info over onze woon-werk formules.</p>
+        </div>
+        <div class="bg-[#FDE9CE] rounded-lg p-8 flex flex-col md:flex-row items-center justify-between text-left relative overflow-hidden">
+          <div class="z-10 md:w-3/5">
+            <p class="text-xl font-semibold text-gray-800 mb-4">Benieuwd naar ervaringen van andere bedrijven met onze formules?</p>
+            <a class="inline-block bg-stib-blue hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-full transition duration-300"
+               href="#">Getuigenissen lezen</a>
             
-         </section>
-      </main>
-      
-      <!--=============== GSAP ===============-->
-      <script src=""></script>
+             <!-- SVG --> 
+          <svg class="w-48 h-auto mt-6 md:mt-0 md:absolute md:right-0 md:top-0" style="margin-top: 2%; margin-right: 0%;"  width="200" viewBox="0 0 234 479" preserveAspectRatio="xMidYMin slice" fill="none" xmlns="http://www.w3.org/2000/svg" > <path d="M160.169 113.96C161.316 120.7 174.223 132.555 177.187 139.344" stroke="black" stroke-width="0.832844" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round" /> <path d="M160.169 81.071C156.966 107.554 176.757 154.449 177.522 170.607L125.655 164.345L126.707 95.1253L160.169 81.071Z" fill="black" /> <path d="M163.946 141.447C159.835 131.504 158.162 118.979 158.162 118.979" stroke="#BFE7FB" stroke-width="0.815583" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round" /> <path d="M4.85497 176.105L236.128 124.955L235.889 412.875C222.552 424.779 207.446 432.092 186.986 427.36L26.0319 395.284C38.413 352.213 63.3186 338.302 63.3186 338.302C63.3186 338.302 55.4787 313.779 36.9309 270.373C26.462 245.898 -3.94088 214.586 4.85497 176.105Z" fill="#2179B0" /> <path d="M152.425 143.455L96.3035 155.883C93.9611 238.106 54.0927 302.401 78.1379 330.701C83.3485 335.912 49.9341 362.825 33.8721 381.899L170.494 336.581C154.91 280.985 167.722 183.992 152.425 143.455Z" fill="#BFE7FB" /> <path d="M152.617 143.932L141.766 117.449L88.0823 70.7931L96.3046 156.361L152.617 143.932Z" fill="#884A1E" /> <path d="M96.3037 156.362L95.1086 143.933L120.349 151.055L148.648 134.324L152.616 143.933L140.809 168.79L96.3037 156.362Z" fill="#BFE7FB" /> <path d="M96.304 156.361L101.993 172.28L120.349 151.055L101.849 177.443L96.304 156.361Z" fill="black" /> <path d="M120.349 151.055L140.809 168.79L152.616 143.932L139.422 176.104L120.349 151.055Z" fill="black" /> <path d="M78.1385 330.701C78.1385 330.701 50.0303 362.92 33.8727 381.898C7.91542 412.397 0.79248 504.753 0.79248 504.753C0.79248 504.753 22.2563 524.066 59.1128 524.066H138.323C138.323 524.066 171.403 524.066 193.823 506.761C203.24 465.985 214.952 418.086 214.952 381.898H175.132C173.363 368.609 174.08 347.241 174.08 347.241C173.937 345.711 170.591 338.11 170.447 336.58L78.1385 330.701Z" fill="#2179B0" /> <path d="M120.349 151.055C118.197 166.591 101.084 215.064 98.5502 233.182C94.2479 263.489 105.768 303.788 113.991 333.378" stroke="#43A6DD" stroke-width="0.815583" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round" /> <path d="M4.85546 176.104C3.80378 195.943 46.6835 217.741 46.6835 217.741C46.6835 217.741 58.8254 320.614 78.138 329.554C58.8732 350.492 34.4459 375.015 21.3477 400.207" stroke="#BFE7FB" stroke-width="0.815583" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round" /> <path d="M73.7407 337.155L171.116 344.947" stroke="#BFE7FB" stroke-width="0.815583" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round" /> <path d="M125.177 333.713L110.119 405.514C107.346 413.927 96.2559 410.772 96.2559 410.772L113.991 333.378" stroke="#BFE7FB" stroke-width="0.815583" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round" /> <path d="M173.458 139.344C182.828 157.461 161.269 265.354 163.515 305.222" stroke="#BFE7FB" stroke-width="0.815583" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round" /> <path d="M84.4957 158.991C74.457 195.704 80.289 251.586 74.6482 283.136" stroke="#BFE7FB" stroke-width="0.815583" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round" /> <path d="M228.528 308.329C209.837 293.988 226.855 253.068 198.459 217.741C190.811 208.228 189.233 202.826 189.233 202.826" stroke="#BFE7FB" stroke-width="0.815583" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round" /> <path d="M203.096 224.099C203.096 224.099 196.691 220.753 192.627 218.984" stroke="#BFE7FB" stroke-width="0.815583" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round" /> <path d="M84.4966 267.935C86.9346 284.714 140.953 312.057 146.211 320.04" stroke="#43A6DD" stroke-width="0.815583" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round" /> <path d="M96.2559 272.477C104.287 280.316 120.923 283.424 127.711 286.818" stroke="#43A6DD" stroke-width="0.815583" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round" /> <path d="M174.366 51.0022C176.852 57.2645 172.693 62.1882 168.917 63.4789" stroke="black" stroke-width="0.832844" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round" /> <path d="M143.342 121.322C134.116 122.66 125.32 119.696 114.755 113.243C114.755 113.243 127.567 127.44 146.162 128.253L143.342 121.322Z" fill="black" /> <path d="M162.177 91.6357C161.986 90.584 161.89 89.389 161.89 88.0983C161.89 86.6642 162.034 85.3257 162.225 84.2262" stroke="white" stroke-width="0.815583" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round" /> <path d="M142.434 121.513C154.72 119.41 165.428 105.069 167.005 90.9187C168.583 76.7688 171.068 48.8516 165.189 32.2638C159.309 15.6759 139.996 4.44211 117.289 10.7044C98.8373 15.8193 84.4008 32.9808 86.6954 55.9265C88.9899 79.0156 89.2768 82.9355 89.9938 90.4885C91.5235 106.933 120.158 125.289 142.434 121.513Z" fill="#884A1E" /> <path d="M147.07 29.2997C156.966 23.5633 168.295 33.124 168.295 48.0387C169.729 45.1227 170.398 38.3824 169.873 33.602C168.152 17.54 158.113 -2.96766 126.706 2.24292C88.0331 -1.39015 78.6636 31.5943 80.9581 54.5399C83.2527 77.6291 47.7346 136.714 47.7346 167.117L81.5796 159.66C81.2928 164.584 78.1856 197.855 78.9505 225.963C84.4479 228.067 106.055 224.242 106.055 224.242C111.313 193.409 94.9646 102.009 106.055 74.8087C116.094 50.2377 127.328 21.2687 147.07 29.2997Z" fill="black" /> <path d="M235.985 136.571C216.194 157.509 200.467 192.166 198.507 217.789" stroke="#BFE7FB" stroke-width="0.815583" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round" /> <path d="M148.314 62.5233L149.844 81.0711L141.717 80.0672" stroke="black" stroke-width="0.832844" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round" /> <path d="M127.568 90.7752C127.568 90.7752 137.415 86.8076 145.398 87.4768C153.047 88.0983 155.819 93.022 155.819 93.022C155.819 93.022 154.242 105.116 143.725 104.256C132.396 103.348 127.568 90.7752 127.568 90.7752Z" fill="#5B260C" /> <path d="M127.568 90.7754C127.568 90.7754 137.176 89.8193 145.111 90.4408C152.76 91.0622 155.819 92.9744 155.819 92.9744C155.819 92.9744 154.863 101.292 144.347 100.48C133.017 99.6191 127.568 90.7754 127.568 90.7754Z" fill="white" /> <path d="M140.571 64.8656C130.962 64.1964 121.641 58.7946 116 63.5749C122.644 54.7313 133.209 60.1331 141.718 60.4677L140.571 64.8656Z" fill="black" /> <path d="M152.377 64.8656C159.787 64.1963 167.722 58.9857 168.917 63.5271C168.344 55.9263 158.018 60.133 151.517 60.4677L152.377 64.8656Z" fill="black" /> <path d="M134.833 71.1757L123.839 68.6421" stroke="black" stroke-width="1.69277" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round" /> <path d="M156.106 71.1757L164.997 68.6421" stroke="black" stroke-width="1.69277" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round" /> <path d="M147.072 29.2993C160.17 26.5267 166.241 53.0099 168.583 54.0615C168.583 54.0615 168.87 60.1804 168.87 60.2282C176.041 58.9853 183.641 54.3484 168.153 36.8045C164.042 29.3471 160.17 26.5745 160.17 26.5745L148.267 24.0887L147.072 29.2993Z" fill="black" /> <path d="M106.247 75.1433C95.1567 102.391 111.505 193.792 106.247 224.577C106.247 224.577 67.9087 230.027 62.4113 227.971C61.5987 199.863 67.861 167.5 68.1478 162.528L106.247 75.1433Z" fill="black" /> <path d="M83.9704 75.6217C87.3644 85.1346 95.1086 91.11 101.275 88.9111C107.442 86.7121 109.736 77.1992 106.39 67.6863C103.044 58.1734 95.2521 52.198 89.0854 54.3969C82.9187 56.5959 80.6241 66.061 83.9704 75.6217Z" fill="#884A1E" /> <path d="M91.7148 60.6586L101.61 79.3975" stroke="#141414" stroke-width="0.815583" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round" /> <path d="M95.443 67.7814L92.3835 78.2504" stroke="#141414" stroke-width="0.815583" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round" /> <path d="M147.071 29.2995C129.719 24.806 114.661 62.4752 96.6387 68.6897C82.9669 73.4222 72.5455 68.6896 73.6928 58.9855C74.1709 54.8266 79.3339 48.9468 80.8158 44.3577C97.3558 32.2634 137.511 17.4921 137.511 17.4921L147.071 29.2995Z" fill="black" /> <path d="M79.3333 53.8707C80.3849 55.8784 87.3644 55.257 101.61 40.5813C105.004 37.0916 108.111 33.9844 111.075 31.3552" stroke="#BFE7FB" stroke-width="0.815583" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round" /> <path d="M77.8044 81.071C73.7889 95.3165 51.8469 101.435 55.48 141.447" stroke="black" stroke-width="0.832844" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round" /> <path d="M100.606 133.703C101.371 151.008 121.209 168.791 104.478 200.962" stroke="black" stroke-width="0.832844" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round" /> <path d="M50.938 155.262C43.9109 132.077 56.5788 123.568 64.9444 113.96" stroke="black" stroke-width="0.832844" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round" /> <path d="M77.1342 56.3562C70.7285 65.1999 74.8873 70.7928 80.0022 71.7967" stroke="black" stroke-width="0.832844" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round" /> <path d="M118.628 4.05938C103.283 -2.39409 96.5428 1.28677 92.5273 15.819" stroke="black" stroke-width="0.832844" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round" /> <path d="M103.952 7.21484C96.973 9.12698 80.672 9.4616 86.4085 27.4835" stroke="black" stroke-width="0.832844" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round" /> <path d="M163.945 20.3127C167.053 33.5065 177.187 35.3231 174.366 46.6525" stroke="black" stroke-width="0.832844" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round" /> <path d="M172.263 45.0267C170.447 44.7877 168.248 40.0551 165.284 34.7968" stroke="#BFE7FB" stroke-width="0.815583" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round" /> <path d="M68.2907 524.066L89.5634 437.877L59.1125 524.066H68.2907Z" fill="black" /> <path d="M107.92 524.066L145.828 395.14" stroke="#BFE7FB" stroke-width="0.815583" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round" /> <path d="M28.3752 519.142L64.8972 387.396" stroke="#BFE7FB" stroke-width="0.815583" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round" /> <path d="M163.372 520.864L198.508 381.899" stroke="#BFE7FB" stroke-width="0.815583" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round" /> <path d="M235.986 303.023L165.858 353.169L186.987 427.456C209.455 434.387 225.565 421.671 235.89 412.971L235.986 303.023Z" fill="#2179B0" /> <path d="M174.128 347.241L252 291.55L170.495 336.581L174.128 347.241Z" fill="black" /> <path d="M163.372 344.325L186.987 427.408C186.987 427.408 199.99 433.861 218.585 426.165" stroke="#BFE7FB" stroke-width="0.815583" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round" /> </svg>
+          </div>
+        </div>
+      </div>
 
-      <!--=============== MAIN JS ===============-->
-      <script src="assets/js/main.js"></script>
-   </body>
+      <div id="formContainer" class="container mx-auto px-4">
+        <div class="max-w-xl mx-auto bg-gray-50 p-8 rounded-lg shadow-md">
+          <form id="infoForm"
+                action="https://webto.salesforce.com/servlet/servlet.WebToLead?encoding=UTF-8"
+                method="POST"
+                accept-charset="UTF-8"
+                target="salesforceFrame"
+                novalidate>
+            <!-- Required Salesforce fields -->
+            <input type="hidden" name="oid" value="00D2X000001h2La"/>
+            <input type="hidden" name="retURL" id="retURL" value=""/>
+            <input type="hidden" name="lead_source" value="Website"/>
+            <!-- Lead Status (must exist in your org) -->
+            <input type="hidden" name="status" value="New"/>
+
+            <!-- Custom field mappings (per request) -->
+            <input type="hidden" name="00N7R00000CJmip" value="NL"/>
+            <input type="hidden" name="00N7R000009JCy5" value="BE"/>
+            <input type="hidden" name="00N7R00000CJmil" value="Unbounce Landing Page"/>
+
+            <div class="grid grid-cols-1 gap-6">
+              <!-- Voornaam -->
+              <div>
+                <label for="voornaam" class="block text-sm text-black">Voornaam</label>
+                <input id="voornaam" name="first_name" type="text" required
+                       class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:border-blue-500"
+                       placeholder="Je voornaam" maxlength="35" pattern="[A-Za-zÀ-ÖØ-öø-ÿ\s\-]{3,35}"/>
+                <p id="voornaamError" class="text-red-600 text-sm mt-1"></p>
+              </div>
+
+              <!-- Achternaam -->
+              <div>
+                <label for="achternaam" class="block text-sm text-black">Achternaam</label>
+                <input id="achternaam" name="last_name" type="text" required
+                       class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:border-blue-500"
+                       placeholder="Je achternaam" maxlength="35" pattern="[A-Za-zÀ-ÖØ-öø-ÿ\s\-]{3,35}"/>
+                <p id="achternaamError" class="text-red-600 text-sm mt-1"></p>
+              </div>
+
+              <!-- Bedrijfsnaam -->
+              <div>
+                <label for="bedrijfsnaam" class="block text-sm text-black">Bedrijfsnaam</label>
+                <input id="bedrijfsnaam" name="company" type="text" required
+                       class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:border-blue-500"
+                       placeholder="De naam van je bedrijf"/>
+                <p id="companyError" class="text-red-600 text-sm mt-1"></p>
+              </div>
+
+              <!-- E-mailadres -->
+              <div>
+                <label for="email" class="block text-sm text-black">E-mailadres</label>
+                <input id="email" name="email" type="email" required
+                       class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:border-blue-500"
+                       placeholder="marwan.parc@mail.com"/>
+                <p id="emailError" class="text-red-600 text-sm mt-1"></p>
+              </div>
+
+              <!-- Telefoonnummer (REQUIRED) -->
+              <div>
+                <label for="telefoon" class="block text-sm text-black">Telefoonnummer</label>
+                <input id="telefoon" name="phone" type="tel" required
+                       inputmode="tel"
+                       class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:border-blue-500"
+                       placeholder="Je telefoonnummer" pattern="[0-9+\s\-()]{7,20}"/>
+                <p id="telefoonError" class="text-red-600 text-sm mt-1"></p>
+              </div>
+
+              <!-- Bedrijfsnummer (OPTIONEEL) -> Salesforce custom field 00N7R00000CJmiv -->
+              <div>
+                <label for="bedrijfsnummer" class="block text-sm text-black">Bedrijfsnummer</label>
+                <input id="bedrijfsnummer" name="00N7R00000CJmiv" type="text"
+                       inputmode="numeric"
+                       class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:border-blue-500"
+                       placeholder="vb. 0123.456.789"
+                       pattern="[0-9]{4}\.[0-9]{3}\.[0-9]{3}"/>
+                <p id="bedrijfsnummerError" class="text-red-600 text-sm mt-1"></p>
+              </div>
+
+              <!-- Server-side error banner -->
+              <div id="serverError" class="hidden">
+                <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+                  We konden je aanvraag niet verwerken. Controleer je gegevens of probeer het later opnieuw.
+                </div>
+              </div>
+
+              <div class="text-center">
+                <button type="submit" id="submitBtn"
+                        class="cta-button inline-flex items-center justify-center px-6 py-3 bg-stib-blue text-white rounded-full shadow-sm hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2">
+                  Versturen
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <iframe id="salesforceFrame" name="salesforceFrame" src="about:blank" style="display:none;"></iframe>
+    </section>
+
+    <!-- Benefits -->
+    <section class="py-8 page-margins">
+      <div class="container mx-auto px-4">
+        <h2 class="text-3xl mb-12">Een voordeel voor zowel de medewerkers als de onderneming</h2>
+        <div class="grid md:grid-cols-3 gap-8">
+          <div class="bg-stib-light-green p-6 rounded-lg">
+            <h3 class="font-bold text-lg mb-2 text-black">Aantrekkelijk in een salarispakket</h3>
+            <div class="flex items-start">
+              <p class="flex-1">Meer dan de gewone terugbetaling woon-werkverkeer: je medewerkers waarderen des te meer hun voordeel als ze niets zelf moeten betalen.</p>
+              <span class="material-icons stib-dark-green text-4xl ml-4">check_circle</span>
+            </div>
+          </div>
+          <div class="bg-stib-light-green p-6 rounded-lg">
+            <h3 class="font-bold text-lg mb-2 text-black">Geen extra moeite</h3>
+            <div class="flex items-start">
+              <p class="flex-1 text-black">Je medewerkers ontvangen hun abonnement rechtstreeks bij hen thuis, en hoeven zelf geen aanvraag meer doen.</p>
+              <span class="material-icons stib-dark-green text-4xl ml-4">check_circle</span>
+            </div>
+          </div>
+          <div class="bg-stib-light-green p-6 rounded-lg">
+            <h3 class="font-bold text-lg mb-2 text-black">Eenvoudige administratie</h3>
+            <div class="flex items-start">
+              <p class="flex-1 text-black">Bundel de facturatie, aanvraag en opvolging van alle abonnementen en pakketten van je werknemers.</p>
+              <span class="material-icons stib-dark-green text-4xl ml-4">check_circle</span>
+            </div>
+          </div>
+          <div class="bg-stib-light-green p-6 rounded-lg">
+            <h3 class="font-bold text-lg mb-2 text-black">Geen dubbel werk</h3>
+            <div class="flex items-start">
+              <p class="flex-1 text-black">Je medewerkers moeten een abonnement niet langer voorschieten, jouw bedrijf hoeft een abonnement niet terug te betalen.</p>
+              <span class="material-icons stib-dark-green text-4xl ml-4">check_circle</span>
+            </div>
+          </div>
+          <div class="bg-stib-light-green p-6 rounded-lg">
+            <h3 class="font-bold text-lg mb-2 text-black">Efficiënt beheer</h3>
+            <div class="flex items-start">
+              <p class="flex-1 text-black">Het abonnement van je werknemer wordt eenvoudig verlengd of terugbetaald bij vertrek of overplaatsing.</p>
+              <span class="material-icons stib-dark-green text-4xl ml-4">check_circle</span>
+            </div>
+          </div>
+          <div class="bg-stib-light-green p-6 rounded-lg">
+            <h3 class="font-bold text-lg mb-2 text-black">Extra voordelen</h3>
+            <div class="flex items-start">
+              <p class="flex-1 text-black">Exclusieve toegang tot aanvullende MIVB-producten waaronder de Brupass XL.</p>
+              <span class="material-icons stib-dark-green text-4xl ml-4">check_circle</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Logos -->
+    <section class="py-16 page-margins">
+      <div class="container mx-auto px-4">
+        <h2 class="text-3xl mb-12">Een greep uit onze tevreden klanten:</h2>
+        <div class="flex justify-left items-center space-x-16">
+          <img alt="KAAI THEATER logo" class="h-20" src="https://image.info.stib-mivb.brussels/lib/fe4015707564057e7d1472/m/1/24575ead-9ea0-423d-85c2-c4cb50db17d8.jpeg"/>
+          <img alt="VUB logo" class="h-20" src="https://image.info.stib-mivb.brussels/lib/fe4015707564057e7d1472/m/1/1101cb43-8d81-40aa-9ba0-8887641e87c4.png"/>
+          <img alt="JCDecaux logo" class="h-16" src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/42/JCDecaux_logo.svg/1024px-JCDecaux_logo.svg.png"/>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer-section bg-white py-6">
+    <div class="container mx-auto px-4 flex justify-end space-x-6 text-sm text-black">
+      <a href="https://www.stib-mivb.be/Footer/Legal-terms" class="hover:underline">Wettelijke vermeldingen</a>
+      <a href="https://www.stib-mivb.be/privacybeleid" class="hover:underline">Privacy</a>
+    </div>
+  </footer>
+
+  <!-- Scripts -->
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const form = document.getElementById('infoForm');
+  const iframe = document.getElementById('salesforceFrame');
+  const successSection = document.getElementById('successMessage');
+  const formContainer = document.getElementById('formContainer');
+  const serverError = document.getElementById('serverError');
+  const submitBtn = document.getElementById('submitBtn');
+
+  const okPath = '/w2l-ok';
+  const okUrl = new URL(okPath, window.location.origin).href;
+  document.getElementById('retURL').value = okUrl;
+
+  const regexName = /^[A-Za-zÀ-ÖØ-öø-ÿ\s-]{3,35}$/;
+  const regexEmail = /^\S+@\S+\.\S+$/;
+  const regexPhone = /^[0-9+\s\-()]{7,20}$/;
+  const regexCompanyNumber = /^\d{4}\.\d{3}\.\d{3}$/;
+
+  let hasSubmitted = false;
+  let successSeen = false;
+  let failTimer = null;
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+
+    let valid = true;
+    serverError.classList.add('hidden');
+    form.querySelectorAll('p[id$="Error"]').forEach(el => el.textContent = '');
+
+    // Voornaam
+    const voor = form.elements['first_name'].value.trim();
+    if (!regexName.test(voor)) {
+      valid = false;
+      document.getElementById('voornaamError').textContent =
+        "Het veld ‘voornaam’ mag geen speciale tekens bevatten en moet tussen 3 en 35 tekens lang zijn.";
+    }
+
+    // Achternaam
+    const ach = form.elements['last_name'].value.trim();
+    if (!regexName.test(ach)) {
+      valid = false;
+      document.getElementById('achternaamError').textContent =
+        "Het veld ‘naam’ mag geen speciale tekens bevatten en moet tussen 3 en 35 tekens lang zijn.";
+    }
+
+    // Bedrijfsnaam
+    const comp = form.elements['company'].value.trim();
+    if (comp === '') {
+      valid = false;
+      document.getElementById('companyError').textContent =
+        "Gelieve de naam van je bedrijf in te geven.";
+    }
+
+    // E-mail
+    const mail = form.elements['email'].value.trim();
+    if (!regexEmail.test(mail)) {
+      valid = false;
+      document.getElementById('emailError').textContent = "Ongeldig e-mailadres.";
+    }
+
+    // Telefoon
+    const phone = form.elements['phone'].value.trim();
+    if (!regexPhone.test(phone)) {
+      valid = false;
+      document.getElementById('telefoonError').textContent = "Ongeldig telefoonnummer.";
+    }
+
+    // Bedrijfsnummer (optioneel)
+    const bn = document.getElementById('bedrijfsnummer').value.trim();
+    if (bn && !regexCompanyNumber.test(bn)) {
+      valid = false;
+      document.getElementById('bedrijfsnummerError').textContent = "Geef een geldig bedrijfsnummer in";
+    }
+
+    if (!valid) return;
+
+    submitBtn.disabled = true;
+    hasSubmitted = true;
+    successSeen = false;
+
+    // ⏲️ Set a fallback timeout: if we never see the same-origin retURL, show error
+    clearTimeout(failTimer);
+    failTimer = setTimeout(() => {
+      if (!successSeen) {
+        submitBtn.disabled = false;
+        hasSubmitted = false;
+        serverError.classList.remove('hidden');
+      }
+    }, 9000); // 9s is a safe buffer for SFDC redirects
+
+    form.submit(); // posts to the iframe
+  });
+
+  iframe.addEventListener('load', () => {
+    // Ignore stray loads unless it follows our submit
+    if (!hasSubmitted) return;
+
+    // Try to detect the same-origin success page
+    try {
+      const loc = iframe.contentWindow.location;
+      if (loc.origin === window.location.origin && loc.href === okUrl) {
+        clearTimeout(failTimer);
+        successSeen = true;
+        hasSubmitted = false;
+        formContainer.style.display = 'none';
+        successSection.classList.remove('hidden');
+        return;
+      }
+      // If it's same-origin but not our ok URL, still count as success
+      if (loc.origin === window.location.origin) {
+        clearTimeout(failTimer);
+        successSeen = true;
+        hasSubmitted = false;
+        formContainer.style.display = 'none';
+        successSection.classList.remove('hidden');
+        return;
+      }
+      // If cross-origin, do nothing here — Salesforce may still redirect to retURL.
+    } catch (_) {
+      // Cross-origin load (Salesforce). Do NOT mark as error yet;
+      // we wait for the next load or for the timeout to trip.
+    }
+  });
+
+  // Language dropdown (unchanged)
+  document.getElementById('languageDropdown').addEventListener('click', e => {
+    e.stopPropagation();
+    document.getElementById('languageMenu').classList.toggle('hidden');
+  });
+  document.querySelectorAll('.language-option').forEach(opt => {
+    opt.addEventListener('click', e => {
+      e.stopPropagation();
+      const lang = opt.dataset.lang;
+      const url = opt.dataset.url;
+      if (lang === 'nl') {
+        document.getElementById('languageMenu').classList.add('hidden');
+        return;
+      }
+      if (url) window.location.href = url;
+    });
+  });
+  document.addEventListener('click', () => {
+    document.getElementById('languageMenu').classList.add('hidden');
+  });
+});
+</script>
+
+</body>
 </html>
