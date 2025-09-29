@@ -1,0 +1,121 @@
+<script runat="server">
+Platform.Load("Core", "1.1.1");
+
+var logDE = "8BF29E68-F498-4A4F-BE50-E1CE24B7C300";
+var cloudPageUrl = "https://cloud.info.stib-mivb.brussels/Dashboard-CollectJourneyEntries";
+var executionId = new Date().getTime();
+
+function safeAutomationLog(stage, message) {
+    try {
+        var logRows = Platform.Function.CreateObject("DataExtensionObject");
+        Platform.Function.SetObjectProperty(logRows, "CustomerKey", logDE);
+        Platform.Function.AddObjectArrayItem(logRows, "Properties", {
+            "Name": "Date",
+            "Value": new Date()
+        });
+        Platform.Function.AddObjectArrayItem(logRows, "Properties", {
+            "Name": "Note",
+            "Value": "[AUTO-" + executionId + "] " + stage + " - " + message
+        });
+        
+        var result = Platform.Function.InvokeCreate(logRows);
+        return true;
+    } catch (ex) {
+        return false;
+    }
+}
+
+try {
+    // Log 1: Automation start
+    safeAutomationLog("AUTOMATION_START", "Script execution initiated");
+    
+    // Log 2: Environment check
+    var currentTime = new Date();
+    var timeString = currentTime.toISOString();
+    safeAutomationLog("ENVIRONMENT", "Time: " + timeString + ", Execution ID: " + executionId);
+    
+    // Log 3: URL validation
+    if (cloudPageUrl.indexOf("https://") === 0) {
+        safeAutomationLog("URL_VALID", "CloudPage URL validated: " + cloudPageUrl);
+    } else {
+        safeAutomationLog("URL_INVALID", "CloudPage URL invalid: " + cloudPageUrl);
+        throw "Invalid CloudPage URL";
+    }
+    
+    // Log 4: Prepare request
+    var headers = ["Content-Type", "User-Agent", "X-Automation-ID"];
+    var headerValues = ["application/json", "SFMC-Automation-Studio", executionId.toString()];
+    var payload = JSON.stringify({
+        "trigger": "automation",
+        "timestamp": timeString,
+        "executionId": executionId,
+        "source": "automation-studio"
+    });
+    
+    safeAutomationLog("REQUEST_PREPARED", "Headers and payload prepared");
+    
+    // Log 5: Making HTTP request
+    safeAutomationLog("HTTP_REQUEST_START", "Initiating HTTP request to CloudPage");
+    
+    try {
+        var startTime = new Date().getTime();
+        var response = HTTP.Post(cloudPageUrl, "application/json", payload, headers, headerValues);
+        var endTime = new Date().getTime();
+        var duration = endTime - startTime;
+        
+        // Log 6: Response received
+        var responseInfo = "Status: " + response.StatusCode + ", Duration: " + duration + "ms";
+        if (response.Response && response.Response.length > 0) {
+            responseInfo += ", Response Length: " + response.Response[0].length + " chars";
+        }
+        safeAutomationLog("HTTP_RESPONSE", responseInfo);
+        
+        // Log 7: Response details
+        if (response.StatusCode >= 200 && response.StatusCode < 300) {
+            safeAutomationLog("HTTP_SUCCESS", "CloudPage responded successfully");
+            
+            // Try to extract any info from response
+            if (response.Response && response.Response[0]) {
+                var responseText = response.Response[0];
+                if (responseText.indexOf("DIAGNOSTIC_COMPLETE") > -1) {
+                    safeAutomationLog("CLOUDPAGE_STATUS", "CloudPage diagnostic mode completed");
+                } else if (responseText.indexOf("ERROR") > -1) {
+                    safeAutomationLog("CLOUDPAGE_ERROR", "CloudPage reported error in response");
+                } else {
+                    safeAutomationLog("CLOUDPAGE_UNKNOWN", "CloudPage response unclear - check manually");
+                }
+            }
+        } else {
+            safeAutomationLog("HTTP_ERROR", "CloudPage returned error status: " + response.StatusCode);
+            if (response.Response && response.Response[0]) {
+                var errorResponse = response.Response[0];
+                var truncatedError = errorResponse.length > 200 ? errorResponse.substring(0, 200) + "..." : errorResponse;
+                safeAutomationLog("HTTP_ERROR_DETAIL", "Error response: " + truncatedError);
+            }
+        }
+        
+    } catch (httpEx) {
+        safeAutomationLog("HTTP_EXCEPTION", "HTTP request failed: " + String(httpEx));
+        throw httpEx;
+    }
+    
+    // Log 8: Automation complete
+    safeAutomationLog("AUTOMATION_COMPLETE", "Script execution completed successfully");
+    
+} catch (mainEx) {
+    safeAutomationLog("AUTOMATION_FAILED", "Script execution failed: " + String(mainEx));
+    
+    // Additional error context
+    var errorContext = "Error Type: " + typeof mainEx;
+    if (mainEx && mainEx.message) {
+        errorContext += ", Message: " + mainEx.message;
+    }
+    if (mainEx && mainEx.stack) {
+        errorContext += ", Stack available: yes";
+    }
+    safeAutomationLog("ERROR_CONTEXT", errorContext);
+}
+
+// Final status log
+safeAutomationLog("AUTOMATION_END", "Script reached end of execution");
+</script>
