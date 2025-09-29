@@ -1,299 +1,350 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Journey Data Collection Worker - Diagnostic Mode</title>
-</head>
-<body>
-
 <script runat="server">
-// IMMEDIATE LOGGING ATTEMPT #1
-try {
-    var logRows1 = Platform.Function.CreateObject("DataExtensionObject");
-    Platform.Function.SetObjectProperty(logRows1, "CustomerKey", "8BF29E68-F498-4A4F-BE50-E1CE24B7C300");
-    Platform.Function.AddObjectArrayItem(logRows1, "Properties", {
-        "Name": "Date",
-        "Value": new Date()
-    });
-    Platform.Function.AddObjectArrayItem(logRows1, "Properties", {
-        "Name": "Note",
-        "Value": "IMMEDIATE_LOG_1 - CloudPage SSJS started execution"
-    });
-    Platform.Function.InvokeCreate(logRows1);
-} catch (ex1) {
-    // Silent failure
+Platform.Load("Core", "1.1.1");
+
+var LOG_DE_KEY = "8BF29E68-F498-4A4F-BE50-E1CE24B7C300";
+var CONFIG_DE_KEY = "C2B8BD86-B9B4-490F-A5C6-5F3B0088A10B";
+var DAILY_DE_KEY = "7C5E411C-0258-4B6D-BA21-58AD4BDCCDAC";
+var AUTH_BASE = "https://mcps4dq7y851bybsng90p082fjq0.auth.marketingcloudapis.com";
+var REST_BASE = "https://mcps4dq7y851bybsng90p082fjq0.rest.marketingcloudapis.com";
+var CLIENT_ID = "c6hbg0vskfdflfwef87nszlo";
+var CLIENT_SECRET = "SlNAdFuk63zs7EoYzdOmXOjX";
+
+var requestContext = {
+    executionId: Platform.Request.GetRequestHeader("X-Execution-Id") || Platform.Function.GUID(),
+    method: Platform.Request.Method || "GET",
+    userAgent: Platform.Request.GetRequestHeader("User-Agent") || "unknown"
+};
+
+function toLocal(date) {
+    try {
+        return Platform.Function.SystemDateToLocalDate(date);
+    } catch (ex) {
+        return date;
+    }
 }
 
-// Load Core library
-try {
-    Platform.Load("Core", "1.1.1");
-    
-    // IMMEDIATE LOGGING ATTEMPT #2 - After Core load
-    var logRows2 = Platform.Function.CreateObject("DataExtensionObject");
-    Platform.Function.SetObjectProperty(logRows2, "CustomerKey", "8BF29E68-F498-4A4F-BE50-E1CE24B7C300");
-    Platform.Function.AddObjectArrayItem(logRows2, "Properties", {
-        "Name": "Date",
-        "Value": new Date()
-    });
-    Platform.Function.AddObjectArrayItem(logRows2, "Properties", {
-        "Name": "Note",
-        "Value": "IMMEDIATE_LOG_2 - Core library loaded successfully"
-    });
-    Platform.Function.InvokeCreate(logRows2);
-    
-} catch (ex2) {
-    // Try alternative logging if Core fails
+function safeLog(stage, message) {
     try {
-        var altLog = Platform.Function.CreateObject("DataExtensionObject");
-        Platform.Function.SetObjectProperty(altLog, "CustomerKey", "8BF29E68-F498-4A4F-BE50-E1CE24B7C300");
-        Platform.Function.AddObjectArrayItem(altLog, "Properties", {
-            "Name": "Date",
-            "Value": new Date()
+        var logRow = Platform.Function.CreateObject("DataExtensionObject");
+        Platform.Function.SetObjectProperty(logRow, "CustomerKey", LOG_DE_KEY);
+        Platform.Function.AddObjectArrayItem(logRow, "Properties", {
+            Name: "Date",
+            Value: toLocal(new Date())
         });
-        Platform.Function.AddObjectArrayItem(altLog, "Properties", {
-            "Name": "Note",
-            "Value": "CORE_LOAD_ERROR - " + String(ex2)
+        Platform.Function.AddObjectArrayItem(logRow, "Properties", {
+            Name: "Note",
+            Value: "[WORKER " + requestContext.executionId + "] " + stage + " - " + message
         });
-        Platform.Function.InvokeCreate(altLog);
-    } catch (ex3) {
-        // Complete failure - will show in HTML output
+        Platform.Function.InvokeCreate(logRow);
+    } catch (ex) {
+        // suppress logging errors
     }
 }
 
-// Global variables for tracking
-var executionStage = "INIT";
-var errorCount = 0;
-var logCount = 0;
+function formatIso(date) {
+    var dateObj = date instanceof Date ? date : new Date(date);
+    return dateObj.toISOString().replace(".000Z", "Z");
+}
 
-// Ultra-safe logging function
-function safelog(stage, message) {
+function computeTargetDates() {
+    var localNow = toLocal(new Date());
+    var midnight = new Date(localNow);
+    midnight.setHours(0, 0, 0, 0);
+    var targetDate = new Date(midnight);
+    targetDate.setDate(targetDate.getDate() - 1);
+    var nextDate = new Date(targetDate);
+    nextDate.setDate(nextDate.getDate() + 1);
+    var startUtc;
+    var endUtc;
     try {
-        executionStage = stage;
-        var timestamp = new Date();
-        
-        // Method 1: Platform.Function.CreateObject
-        try {
-            var logRows = Platform.Function.CreateObject("DataExtensionObject");
-            Platform.Function.SetObjectProperty(logRows, "CustomerKey", "8BF29E68-F498-4A4F-BE50-E1CE24B7C300");
-            Platform.Function.AddObjectArrayItem(logRows, "Properties", {
-                "Name": "Date",
-                "Value": timestamp
-            });
-            Platform.Function.AddObjectArrayItem(logRows, "Properties", {
-                "Name": "Note",
-                "Value": stage + " - " + message
-            });
-            
-            var result = Platform.Function.InvokeCreate(logRows);
-            logCount++;
-            return true;
-        } catch (logEx1) {
-            // Method 2: Try WSProxy as fallback
-            try {
-                var api = new Script.Util.WSProxy();
-                var props = [
-                    {
-                        Name: "Date",
-                        Value: timestamp
-                    },
-                    {
-                        Name: "Note", 
-                        Value: stage + " - " + message + " [FALLBACK_LOG]"
-                    }
-                ];
-                
-                var obj = {
-                    CustomerKey: "8BF29E68-F498-4A4F-BE50-E1CE24B7C300",
-                    Properties: props
-                };
-                
-                var wsResult = api.create("DataExtensionObject", obj);
-                logCount++;
-                return true;
-            } catch (logEx2) {
-                errorCount++;
-                return false;
-            }
-        }
-    } catch (mainLogEx) {
-        errorCount++;
-        return false;
+        startUtc = Platform.Function.LocalDateToSystemDate(targetDate);
+        endUtc = Platform.Function.LocalDateToSystemDate(nextDate);
+    } catch (ex) {
+        var offset = targetDate.getTimezoneOffset() * 60000;
+        startUtc = new Date(targetDate.getTime() + offset);
+        endUtc = new Date(nextDate.getTime() + nextDate.getTimezoneOffset() * 60000);
+    }
+    var startUtcDate = startUtc instanceof Date ? startUtc : new Date(startUtc);
+    var endUtcDate = endUtc instanceof Date ? endUtc : new Date(endUtc);
+    return {
+        targetLocal: targetDate,
+        startUtc: startUtcDate,
+        endUtc: endUtcDate
+    };
+}
+
+function parseJsonSafe(text, fallback) {
+    try {
+        return Platform.Function.ParseJSON(text);
+    } catch (ex) {
+        return fallback;
     }
 }
 
-// Start main execution with extensive logging
-try {
-    safelog("MAIN_START", "Beginning main execution block");
-    
-    // Test 1: Basic Platform functionality
-    safelog("TEST_PLATFORM", "Testing basic Platform functions");
-    var testDate = new Date();
-    var testString = String(testDate);
-    safelog("TEST_PLATFORM_RESULT", "Date test successful: " + testString);
-    
-    // Test 2: Request information
-    try {
-        var userAgent = Platform.Request.GetRequestHeader("User-Agent") || "unknown";
-        var method = Platform.Request.Method || "unknown";
-        var queryString = Platform.Request.QueryString || "none";
-        safelog("REQUEST_INFO", "UA: " + userAgent + ", Method: " + method + ", QS: " + queryString);
-    } catch (reqEx) {
-        safelog("REQUEST_ERROR", "Request info error: " + String(reqEx));
+function fetchAccessToken() {
+    safeLog("BEFORE_AUTH", "Requesting OAuth token");
+    var payload = {
+        grant_type: "client_credentials",
+        client_id: CLIENT_ID,
+        client_secret: CLIENT_SECRET
+    };
+    var authResponse = HTTP.Post(AUTH_BASE + "/v2/token", "application/json", Platform.Function.Stringify(payload));
+    safeLog("AFTER_AUTH", "Status: " + authResponse.StatusCode);
+
+    if (authResponse.StatusCode < 200 || authResponse.StatusCode >= 300) {
+        throw new Error("Authentication failed: HTTP " + authResponse.StatusCode);
     }
-    
-    // Test 3: Variable setting
-    try {
-        Platform.Variable.SetValue("testVar", "success");
-        var testVar = Platform.Variable.GetValue("testVar");
-        safelog("VARIABLE_TEST", "Variable test result: " + testVar);
-    } catch (varEx) {
-        safelog("VARIABLE_ERROR", "Variable test error: " + String(varEx));
+
+    var body = (authResponse.Response && authResponse.Response[0]) ? authResponse.Response[0] : "{}";
+    var parsed = parseJsonSafe(body, {});
+
+    if (!parsed || !parsed.access_token) {
+        throw new Error("Authentication failed: access_token missing");
     }
-    
-    // Test 4: WSProxy basic functionality
-    try {
-        var testProxy = new Script.Util.WSProxy();
-        if (testProxy) {
-            safelog("WSPROXY_TEST", "WSProxy object created successfully");
-        } else {
-            safelog("WSPROXY_TEST", "WSProxy object is null/undefined");
-        }
-    } catch (proxyEx) {
-        safelog("WSPROXY_ERROR", "WSProxy creation error: " + String(proxyEx));
-    }
-    
-    // Test 5: Data Extension access test
-    safelog("DE_ACCESS_START", "Testing Data Extension access");
-    
-    try {
-        // Test read access to log DE itself
-        var api = new Script.Util.WSProxy();
-        var cols = ["Date", "Note"];
-        var filter = {
-            Property: "Date",
-            SimpleOperator: "greaterThan",
-            Value: new Date(Date.now() - 3600000) // Last hour
-        };
-        
-        var testResults = api.retrieve("DataExtensionObject[8BF29E68-F498-4A4F-BE50-E1CE24B7C300]", cols, filter);
-        
-        if (testResults) {
-            var status = testResults.Status || "unknown";
-            var resultCount = (testResults.Results && testResults.Results.length) || 0;
-            safelog("DE_READ_TEST", "Log DE read test - Status: " + status + ", Results: " + resultCount);
-        } else {
-            safelog("DE_READ_TEST", "Log DE read test returned null");
-        }
-        
-    } catch (deEx) {
-        safelog("DE_ACCESS_ERROR", "Data Extension test error: " + String(deEx));
-    }
-    
-    // Test 6: Journey Config DE access
-    try {
-        safelog("JOURNEY_CONFIG_START", "Testing Journey Config DE access");
-        var configAPI = new Script.Util.WSProxy();
-        var configCols = ["JourneyID"];
-        var configResults = configAPI.retrieve("DataExtensionObject[C2B8BD86-B9B4-490F-A5C6-5F3B0088A10B]", configCols);
-        
-        if (configResults && configResults.Status) {
-            var configStatus = configResults.Status;
-            var configCount = (configResults.Results && configResults.Results.length) || 0;
-            safelog("JOURNEY_CONFIG_RESULT", "Config DE Status: " + configStatus + ", Records: " + configCount);
-            
-            // Log first few journey IDs if found
-            if (configResults.Results && configResults.Results.length > 0) {
-                for (var i = 0; i < Math.min(3, configResults.Results.length); i++) {
-                    var props = configResults.Results[i].Properties;
-                    if (props) {
-                        for (var j = 0; j < props.length; j++) {
-                            if (props[j].Name === "JourneyID") {
-                                safelog("JOURNEY_ID_" + i, "Found JourneyID: " + props[j].Value);
-                                break;
-                            }
-                        }
-                    }
+
+    return {
+        token: parsed.access_token,
+        expiresIn: parsed.expires_in || parsed.expiresIn || null
+    };
+}
+
+function retrieveConfigJourneys() {
+    safeLog("BEFORE_CONFIG_LOAD", "Loading journey configuration");
+    var proxy = new Script.Util.WSProxy();
+    var columns = ["JourneyID"];
+    var moreData = true;
+    var request = null;
+    var rows = [];
+    var options = { BatchSize: 2500 };
+
+    while (moreData) {
+        request = proxy.retrieve("DataExtensionObject[" + CONFIG_DE_KEY + "]", columns, null, options);
+        if (request && request.Results) {
+            for (var i = 0; i < request.Results.length; i++) {
+                var props = request.Results[i].Properties;
+                var row = {};
+                for (var j = 0; j < props.length; j++) {
+                    row[props[j].Name] = props[j].Value;
+                }
+                if (row.JourneyID) {
+                    rows.push(row);
                 }
             }
-        } else {
-            safelog("JOURNEY_CONFIG_RESULT", "Config DE query returned null or no status");
         }
-        
-    } catch (configEx) {
-        safelog("JOURNEY_CONFIG_ERROR", "Journey Config access error: " + String(configEx));
+
+        if (request && request.HasMoreRows && request.ContinueRequest) {
+            options.ContinueRequest = request.ContinueRequest;
+        } else {
+            moreData = false;
+        }
     }
-    
-    // Test 7: Insert test record to entries DE
-    try {
-        safelog("INSERT_TEST_START", "Testing insert to Journey Entries DE");
-        
-        var testInsertRows = Platform.Function.CreateObject("DataExtensionObject");
-        Platform.Function.SetObjectProperty(testInsertRows, "CustomerKey", "7C5E411C-0258-4B6D-BA21-58AD4BDCCDAC");
-        Platform.Function.AddObjectArrayItem(testInsertRows, "Properties", {
-            "Name": "JourneyID",
-            "Value": "TEST-" + new Date().getTime()
-        });
-        Platform.Function.AddObjectArrayItem(testInsertRows, "Properties", {
-            "Name": "Date",
-            "Value": new Date()
-        });
-        Platform.Function.AddObjectArrayItem(testInsertRows, "Properties", {
-            "Name": "DailyEntries",
-            "Value": 999
-        });
-        
-        var insertResult = Platform.Function.InvokeCreate(testInsertRows);
-        safelog("INSERT_TEST_RESULT", "Test insert result: " + JSON.stringify(insertResult));
-        
-    } catch (insertEx) {
-        safelog("INSERT_TEST_ERROR", "Test insert error: " + String(insertEx));
+
+    safeLog("AFTER_CONFIG_LOAD", "Loaded " + rows.length + " journey configuration rows");
+    return rows;
+}
+
+function normaliseUrl(url) {
+    if (url.indexOf("http") === 0) {
+        return url;
     }
-    
-    // Final status
-    safelog("EXECUTION_COMPLETE", "All tests completed - Logs: " + logCount + ", Errors: " + errorCount);
-    Platform.Variable.SetValue("executionResult", "DIAGNOSTIC_COMPLETE");
-    Platform.Variable.SetValue("logCount", logCount);
-    Platform.Variable.SetValue("errorCount", errorCount);
-    Platform.Variable.SetValue("lastStage", executionStage);
-    
-} catch (mainEx) {
-    // Final error logging attempt
-    try {
-        safelog("MAIN_EXCEPTION", "Main execution error: " + String(mainEx));
-        Platform.Variable.SetValue("executionResult", "MAIN_ERROR: " + String(mainEx));
-    } catch (finalEx) {
-        Platform.Variable.SetValue("executionResult", "COMPLETE_FAILURE");
+    if (url.indexOf("/") === 0) {
+        return REST_BASE + url;
+    }
+    return REST_BASE + "/" + url;
+}
+
+function buildFilter(definitionId, startIso, endIso) {
+    var filter = "DefinitionID eq '" + definitionId + "' and EntryDate ge '" + startIso + "' and EntryDate lt '" + endIso + "'";
+    var encoded = Platform.Function.URLEncode(filter);
+    return encoded ? encoded.split("+").join("%20") : "";
+}
+
+function countJourneyEntries(accessToken, definitionId, startIso, endIso) {
+    var total = 0;
+    var processedPages = 0;
+    var requestUrl = REST_BASE + "/interaction/v1/interactions/journeyhistory/entries?$page=1&$pageSize=2000&$filter=" + buildFilter(definitionId, startIso, endIso);
+
+    while (requestUrl) {
+        processedPages++;
+        safeLog("BEFORE_JOURNEY_CALL", definitionId + " - requesting page " + processedPages);
+        var httpRequest = new Script.Util.HttpRequest(requestUrl);
+        httpRequest.method = "GET";
+        httpRequest.retries = 2;
+        httpRequest.continueOnError = true;
+        httpRequest.addHeader("Authorization", "Bearer " + accessToken);
+        httpRequest.addHeader("Content-Type", "application/json");
+        var httpResponse = httpRequest.send();
+        safeLog("AFTER_JOURNEY_CALL", definitionId + " - HTTP " + httpResponse.statusCode);
+
+        if (httpResponse.statusCode < 200 || httpResponse.statusCode >= 300) {
+            throw new Error("Journey History request failed for " + definitionId + " with HTTP " + httpResponse.statusCode);
+        }
+
+        var content = httpResponse.content || "{}";
+        var parsed = parseJsonSafe(content, {});
+        var items = parsed && parsed.items ? parsed.items : [];
+        if (parsed && typeof parsed.count === "number" && (!parsed.items || parsed.items.length === 0) && processedPages === 1) {
+            total = parsed.count;
+            requestUrl = null;
+            continue;
+        }
+
+        total += items.length;
+
+        var nextLink = null;
+        if (parsed && parsed.links && parsed.links.next) {
+            nextLink = parsed.links.next;
+        }
+
+        if (nextLink) {
+            requestUrl = normaliseUrl(nextLink);
+        } else {
+            requestUrl = null;
+        }
+
+        if (items.length === 0) {
+            requestUrl = null;
+        }
+    }
+
+    safeLog("PARSE", definitionId + " - counted " + total + " entries");
+    return total;
+}
+
+function upsertDailyEntries(journeyId, count, targetDate) {
+    var entriesDE = DataExtension.Init(DAILY_DE_KEY);
+    var formattedDate = Platform.Function.FormatDate(targetDate, "yyyy-MM-dd HH:mm:ss");
+
+    var filter = {
+        LeftOperand: {
+            Property: "JourneyID",
+            SimpleOperator: "equals",
+            Value: journeyId
+        },
+        LogicalOperator: "AND",
+        RightOperand: {
+            Property: "Date",
+            SimpleOperator: "equals",
+            Value: formattedDate
+        }
+    };
+
+    var existing = entriesDE.Rows.Retrieve(filter);
+    safeLog("CHECK_EXISTS", journeyId + " - existing rows: " + (existing ? existing.length : 0));
+
+    if (existing && existing.length > 0) {
+        safeLog("BEFORE_UPDATE", journeyId + " - updating row");
+        entriesDE.Rows.Update({ DailyEntries: count }, ["JourneyID", "Date"], [journeyId, formattedDate]);
+        safeLog("AFTER_UPDATE", journeyId + " - row updated to " + count);
+        return "updated";
+    } else {
+        safeLog("BEFORE_INSERT", journeyId + " - inserting row");
+        entriesDE.Rows.Add({
+            JourneyID: journeyId,
+            DailyEntries: count,
+            Date: formattedDate
+        });
+        safeLog("AFTER_INSERT", journeyId + " - row inserted with " + count);
+        return "inserted";
     }
 }
+
+function handleRequest() {
+    var payloadText = Platform.Request.GetRequestBody() || "{}";
+    var payload = parseJsonSafe(payloadText, {});
+    if (payload && payload.executionId) {
+        requestContext.executionId = payload.executionId;
+    }
+
+    safeLog("START", "Worker invoked. Method: " + requestContext.method + ", UA: " + requestContext.userAgent);
+
+    if (requestContext.method !== "POST") {
+        safeLog("ERROR", "Unsupported HTTP method: " + requestContext.method);
+        return {
+            status: "error",
+            message: "Method not allowed. Use POST.",
+            httpStatus: 405
+        };
+    }
+
+    var auth = fetchAccessToken();
+    var configRows = retrieveConfigJourneys();
+
+    if (!configRows || configRows.length === 0) {
+        safeLog("PARSE", "No journeys configured. Nothing to process");
+        return {
+            status: "ok",
+            message: "No journeys configured",
+            processedJourneys: 0,
+            inserted: 0,
+            updated: 0,
+            totalEntries: 0
+        };
+    }
+
+    var dates = computeTargetDates();
+    var startIso = formatIso(dates.startUtc);
+    var endIso = formatIso(dates.endUtc);
+    var summary = {
+        processedJourneys: 0,
+        inserted: 0,
+        updated: 0,
+        totalEntries: 0
+    };
+
+    safeLog("PARSE", "Processing " + configRows.length + " journeys for date " + Platform.Function.FormatDate(dates.targetLocal, "yyyy-MM-dd"));
+
+    for (var i = 0; i < configRows.length; i++) {
+        var journeyId = configRows[i].JourneyID;
+        if (!journeyId) {
+            continue;
+        }
+
+        summary.processedJourneys++;
+        var count = countJourneyEntries(auth.token, journeyId, startIso, endIso);
+        summary.totalEntries += count;
+        var action = upsertDailyEntries(journeyId, count, dates.targetLocal);
+        if (action === "inserted") {
+            summary.inserted++;
+        } else if (action === "updated") {
+            summary.updated++;
+        }
+    }
+
+    safeLog("PARSE_DONE", "Processed " + summary.processedJourneys + " journeys");
+    safeLog("FINAL", "Inserted: " + summary.inserted + ", Updated: " + summary.updated + ", Total entries: " + summary.totalEntries);
+
+    return {
+        status: "ok",
+        processedJourneys: summary.processedJourneys,
+        inserted: summary.inserted,
+        updated: summary.updated,
+        totalEntries: summary.totalEntries,
+        startDateUtc: startIso,
+        endDateUtc: endIso
+    };
+}
+
+var responseBody;
+var statusCode = 200;
+
+try {
+    responseBody = handleRequest();
+    if (responseBody && responseBody.httpStatus) {
+        statusCode = responseBody.httpStatus;
+        delete responseBody.httpStatus;
+    }
+} catch (ex) {
+    statusCode = 500;
+    safeLog("ERROR", String(ex));
+    responseBody = {
+        status: "error",
+        message: String(ex)
+    };
+}
+
+Platform.Response.SetStatus(statusCode, statusCode === 200 ? "OK" : "ERROR");
+Platform.Response.SetResponseHeader("Content-Type", "application/json");
+Write(Platform.Function.Stringify(responseBody));
+Platform.Response.End();
 </script>
-
-<h1>Journey Data Collection Worker - Diagnostic Mode</h1>
-
-<h2>Execution Summary</h2>
-<p><strong>Result:</strong> %%=v(@executionResult)=%%</p>
-<p><strong>Logs Written:</strong> %%=v(@logCount)=%%</p>
-<p><strong>Errors:</strong> %%=v(@errorCount)=%%</p>
-<p><strong>Last Stage:</strong> %%=v(@lastStage)=%%</p>
-<p><strong>Current Time:</strong> %%=Format(Now(), "yyyy-MM-dd HH:mm:ss")=%%</p>
-
-<h2>Manual Test Results</h2>
-<div id="clientResults">
-    <p>Loading client-side diagnostics...</p>
-</div>
-
-<script>
-// Client-side diagnostics
-document.addEventListener('DOMContentLoaded', function() {
-    var results = [];
-    results.push("Client-side JavaScript executed successfully");
-    results.push("Page URL: " + window.location.href);
-    results.push("User Agent: " + navigator.userAgent);
-    results.push("Page load time: " + new Date().toISOString());
-    
-    document.getElementById('clientResults').innerHTML = results.map(function(r) {
-        return '<p>✓ ' + r + '</p>';
-    }).join('');
-});
-</script>
-
-</body>
-</html>
