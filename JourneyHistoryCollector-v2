@@ -17,7 +17,7 @@ VAR @estimateCount, @countStartPos, @countEndPos, @countSegment
 VAR @lineRows, @lineCount, @lineIndex, @line, @normalizedLine
 VAR @columnRows, @columnCount, @statusValue, @activityTypeValue
 VAR @entryCount, @parsedRows, @debugSampleLimit, @debugLogged
-VAR @responseSummary, @journeySummary, @escapedSummary
+VAR @responseSummary, @journeySummary, @escapedSummary, @dq
 /* === Config === */
 SET @clientId     = "c6hbg0vskfdflfwef87nszlo"
 SET @clientSecret = "bGF8p8QTtlEKcAK7aJANlY2v"
@@ -25,6 +25,7 @@ SET @authUrl      = "https://mcps4dq7y851bybsng90p082fjq0.auth.marketingcloudapi
 SET @restBaseUrl  = "https://mcps4dq7y851bybsng90p082fjq0.rest.marketingcloudapis.com"
 SET @currentTime  = Now()
 SET @accountId = "100013802"
+SET @dq = Char(34)
 /* Target: yesterday UTC day window */
 SET @yesterday      = DateAdd(@currentTime, -1, "D")
 SET @yesterdayStart = Concat(Format(@yesterday, "yyyy-MM-dd"), "T00:00:00Z")
@@ -84,23 +85,25 @@ IF NOT Empty(@accessToken) THEN
       ENDIF
       IF NOT Empty(@journeyInstanceId) THEN
         SET @historyPayload = Concat(
-          '{',
-            '"definitionInstanceIds":["', @journeyInstanceId, '"],',
-            '"start":"', @yesterdayStart, '",',
-            '"end":"',   @yesterdayEnd,   '",',
-            '"activityTypes":["trigger"],',
-            '"statuses":["complete"]'
-          '}'
+          "{",
+            @dq, "definitionInstanceIds", @dq, ":",
+            "[", @dq, @journeyInstanceId, @dq, "]", ",",
+            @dq, "start", @dq, ":", @dq, @yesterdayStart, @dq, ",",
+            @dq, "end", @dq, ":", @dq, @yesterdayEnd, @dq, ",",
+            @dq, "activityTypes", @dq, ":", "[", @dq, "trigger", @dq, "]", ",",
+            @dq, "statuses", @dq, ":", "[", @dq, "complete", @dq, "]"
+          "}"
         )
       ELSE
         SET @historyPayload = Concat(
-          '{',
-            '"definitionIds":["', @journeyId, '"],',
-            '"start":"', @yesterdayStart, '",',
-            '"end":"',   @yesterdayEnd,   '",',
-            '"activityTypes":["trigger"],',
-            '"statuses":["complete"]'
-          '}'
+          "{",
+            @dq, "definitionIds", @dq, ":",
+            "[", @dq, @journeyId, @dq, "]", ",",
+            @dq, "start", @dq, ":", @dq, @yesterdayStart, @dq, ",",
+            @dq, "end", @dq, ":", @dq, @yesterdayEnd, @dq, ",",
+            @dq, "activityTypes", @dq, ":", "[", @dq, "trigger", @dq, "]", ",",
+            @dq, "statuses", @dq, ":", "[", @dq, "complete", @dq, "]"
+          "}"
         )
       ENDIF
       /* Log the exact request */
