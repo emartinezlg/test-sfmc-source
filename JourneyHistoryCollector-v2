@@ -3,53 +3,55 @@
    Journey History Collector - Download (AMPscript only)
    Safe for CloudPages (no streaming / no SSJS)
    ============================================ */
-   
+
 VAR @clientId, @clientSecret, @authUrl, @restBaseUrl
-VAR @accessToken, @authPayload, @authResponse, @authStatus
-VAR @accountId
-VAR @tokenStart, @tokenEnd, @tokenMarker
+VAR @accountId, @accessToken, @authPayload, @authResponse, @authStatus
+VAR @tokenMarker, @tokenStart, @tokenEnd
 VAR @currentTime, @yesterday, @yesterdayStart, @yesterdayEnd
-VAR @configRows, @rowCount, @i, @journeyId, @journeyName
-VAR @journeyInstanceId
-VAR @historyEndpoint, @estimateEndpoint, @historyPayload, @authHeader
+VAR @configRows, @rowCount, @i, @row, @journeyId, @journeyName
+VAR @journeyInstanceId, @historyEndpoint, @estimateEndpoint
+VAR @historyPayload, @authHeaderName, @authHeaderValue
 VAR @estimateStatus, @estimateResponse, @historyStatus, @historyResponse
-VAR @estimateCount, @countStartPos, @countEndPos, @countSegment
-VAR @lineRows, @lineCount, @lineIndex, @line, @normalizedLine
-VAR @columnRows, @columnCount, @statusValue, @activityTypeValue
-VAR @entryCount, @parsedRows, @debugSampleLimit, @debugLogged
-VAR @responseSummary, @journeySummary, @escapedSummary, @dq, @newline
+VAR @estimateHeaders, @historyHeaders, @estimateCount, @countMarker
+VAR @countStart, @countEnd, @responseSummary, @journeySummary
+VAR @lineRows, @lineCount, @lineIndex, @line, @columnRows, @columnCount
+VAR @statusValue, @activityTypeValue, @entryCount, @parsedRows
+VAR @debugLimit, @debugLogged, @escapedSummary
+
 /* === Config === */
 SET @clientId     = "c6hbg0vskfdflfwef87nszlo"
 SET @clientSecret = "bGF8p8QTtlEKcAK7aJANlY2v"
 SET @authUrl      = "https://mcps4dq7y851bybsng90p082fjq0.auth.marketingcloudapis.com/v2/token"
 SET @restBaseUrl  = "https://mcps4dq7y851bybsng90p082fjq0.rest.marketingcloudapis.com"
+SET @accountId    = "100013802"
 SET @currentTime  = Now()
-SET @accountId = "100013802"
-SET @dq = Char(34)
-SET @newline = Char(10)
-/* Target: yesterday UTC day window */
+
+/* Target window: previous UTC day */
 SET @yesterday      = DateAdd(@currentTime, -1, "D")
 SET @yesterdayStart = Concat(Format(@yesterday, "yyyy-MM-dd"), "T00:00:00Z")
 SET @yesterdayEnd   = Concat(Format(@yesterday, "yyyy-MM-dd"), "T23:59:59Z")
+
 InsertDE("Dashboard_DailyLog","Date",@currentTime,"Note","[CLOUDPAGE] === Starting Journey History Collection ===")
-InsertDE("Dashboard_DailyLog","Date",@currentTime,"Note",Concat("[CLOUDPAGE] Target Date: ",Format(@yesterday,"yyyy-MM-dd")))
+InsertDE("Dashboard_DailyLog","Date",@currentTime,"Note",Concat("[CLOUDPAGE] Target Date: ", Format(@yesterday, "yyyy-MM-dd")))
+
 /* === OAuth === */
 SET @authPayload = Concat(
-  "{",
-    @dq, "grant_type", @dq, ":", @dq, "client_credentials", @dq, ",",
-    @dq, "client_id", @dq, ":", @dq, @clientId, @dq, ",",
-    @dq, "client_secret", @dq, ":", @dq, @clientSecret, @dq, ",",
-    @dq, "account_id", @dq, ":", @dq, @accountId, @dq,
-  "}"
+  '{',
+    '"grant_type":"client_credentials",',
+    '"client_id":"',  @clientId,     '",',
+    '"client_secret":"', @clientSecret, '",',
+    '"account_id":"', @accountId, '"',
+  '}'
 )
 SET @authStatus  = HTTPPost(@authUrl, "application/json", @authPayload, @authResponse)
 SET @accessToken = ""
+
 IF @authStatus == 200 THEN
-  SET @tokenMarker = Concat(@dq, "access_token", @dq, ":", @dq)
-  SET @tokenStart = IndexOf(@authResponse, @tokenMarker)
+  SET @tokenMarker = '"access_token":"'
+  SET @tokenStart  = IndexOf(@authResponse, @tokenMarker)
   IF @tokenStart > 0 THEN
     SET @tokenStart = Add(@tokenStart, Length(@tokenMarker))
-    SET @tokenEnd   = IndexOf(@authResponse, @dq, @tokenStart)
+    SET @tokenEnd   = IndexOf(@authResponse, '"', @tokenStart)
     IF @tokenEnd > @tokenStart THEN
       SET @accessToken = Substring(@authResponse, @tokenStart, Subtract(@tokenEnd, @tokenStart))
     ENDIF
@@ -63,27 +65,25 @@ IF @authStatus == 200 THEN
 ELSE
   InsertDE("Dashboard_DailyLog","Date",@currentTime,"Note",Concat("[CLOUDPAGE] ✗ AUTH FAILED. Status ", @authStatus, " Response: ", Substring(@authResponse,1,500)))
 ENDIF
+
 SET @responseSummary = ""
+
 IF NOT Empty(@accessToken) THEN
-  /* Journeys to process */
   SET @configRows = LookupRows("Dashboard_JourneyConfig","Active","1")
   SET @rowCount   = RowCount(@configRows)
   InsertDE("Dashboard_DailyLog","Date",@currentTime,"Note",Concat("[CLOUDPAGE] Found ", @rowCount, " active journey(s) to process"))
+
   IF @rowCount > 0 THEN
-    /* Pre-build endpoint + header */
     SET @historyEndpoint  = Concat(@restBaseUrl, "/interaction/v1/interactions/journeyhistory/download")
     SET @estimateEndpoint = Concat(@restBaseUrl, "/interaction/v1/interactions/journeyhistory/estimate")
-    SET @authHeader       = Concat("Bearer ", @accessToken)
-    SET @debugSampleLimit = 5
+    SET @authHeaderName   = "Authorization"
+    SET @authHeaderValue  = Concat("Bearer ", @accessToken)
+    SET @debugLimit       = 5
+
     FOR @i = 1 TO @rowCount DO
-      VAR @row
-      SET @row        = Row(@configRows, @i)
-      SET @journeyId  = Field(@row, "JourneyID")
-      SET @journeyName= Field(@row, "JourneyGroupName")
-      InsertDE("Dashboard_DailyLog","Date",@currentTime,"Note",Concat("[CLOUDPAGE] --- Processing Journey ", @i, "/", @rowCount, " ---"))
-      InsertDE("Dashboard_DailyLog","Date",@currentTime,"Note",Concat("[CLOUDPAGE] Journey: ", @journeyName, " (", @journeyId, ")"))
-      /* Support either the parent definitionId or a specific definitionInstanceId */
-      SET @estimateCount = ""
+      SET @row           = Row(@configRows, @i)
+      SET @journeyId     = Field(@row, "JourneyID")
+      SET @journeyName   = Field(@row, "JourneyGroupName")
       SET @journeyInstanceId = Field(@row, "JourneyInstanceID")
       IF Empty(@journeyInstanceId) THEN
         SET @journeyInstanceId = Field(@row, "DefinitionInstanceId")
@@ -91,105 +91,96 @@ IF NOT Empty(@accessToken) THEN
       IF Empty(@journeyInstanceId) THEN
         SET @journeyInstanceId = Field(@row, "JourneyVersionID")
       ENDIF
+
+      InsertDE("Dashboard_DailyLog","Date",@currentTime,"Note",Concat("[CLOUDPAGE] --- Processing Journey ", @i, "/", @rowCount, " ---"))
+      InsertDE("Dashboard_DailyLog","Date",@currentTime,"Note",Concat("[CLOUDPAGE] Journey: ", @journeyName, " (", @journeyId, ")"))
+
       IF NOT Empty(@journeyInstanceId) THEN
         SET @historyPayload = Concat(
-          "{",
-            @dq, "definitionInstanceIds", @dq, ":",
-            "[", @dq, @journeyInstanceId, @dq, "]", ",",
-            @dq, "start", @dq, ":", @dq, @yesterdayStart, @dq, ",",
-            @dq, "end", @dq, ":", @dq, @yesterdayEnd, @dq, ",",
-            @dq, "activityTypes", @dq, ":", "[", @dq, "trigger", @dq, "]", ",",
-            @dq, "statuses", @dq, ":", "[", @dq, "complete", @dq, "]"
-          "}"
+          '{',
+            '"definitionInstanceIds":["', @journeyInstanceId, '"],',
+            '"start":"', @yesterdayStart, '",',
+            '"end":"',   @yesterdayEnd,   '",',
+            '"activityTypes":["trigger"],',
+            '"statuses":["Complete"]',
+          '}'
         )
-      ELSE
-        SET @historyPayload = Concat(
-          "{",
-            @dq, "definitionIds", @dq, ":",
-            "[", @dq, @journeyId, @dq, "]", ",",
-            @dq, "start", @dq, ":", @dq, @yesterdayStart, @dq, ",",
-            @dq, "end", @dq, ":", @dq, @yesterdayEnd, @dq, ",",
-            @dq, "activityTypes", @dq, ":", "[", @dq, "trigger", @dq, "]", ",",
-            @dq, "statuses", @dq, ":", "[", @dq, "complete", @dq, "]"
-          "}"
-        )
-      ENDIF
-      /* Log the exact request */
-      InsertDE("Dashboard_DailyLog","Date",@currentTime,"Note",Concat("[CLOUDPAGE] DEBUG Endpoint: ", @historyEndpoint))
-      InsertDE("Dashboard_DailyLog","Date",@currentTime,"Note",Concat("[CLOUDPAGE] DEBUG Payload: ", Substring(@historyPayload,1,500)))
-      IF NOT Empty(@journeyInstanceId) THEN
         InsertDE("Dashboard_DailyLog","Date",@currentTime,"Note",Concat("[CLOUDPAGE] DEBUG Using definitionInstanceId: ", @journeyInstanceId))
       ELSE
+        SET @historyPayload = Concat(
+          '{',
+            '"definitionIds":["', @journeyId, '"],',
+            '"start":"', @yesterdayStart, '",',
+            '"end":"',   @yesterdayEnd,   '",',
+            '"activityTypes":["trigger"],',
+            '"statuses":["Complete"]',
+          '}'
+        )
         InsertDE("Dashboard_DailyLog","Date",@currentTime,"Note","[CLOUDPAGE] DEBUG Using parent definitionId")
       ENDIF
-      /* Quick estimate before requesting the CSV */
-      HTTPHeader("Authorization", @authHeader)
-      HTTPHeader("x-direct-pipe", "true")
-      SET @estimateStatus = HTTPPost(@estimateEndpoint, "application/json", @historyPayload, @estimateResponse)
+
+      InsertDE("Dashboard_DailyLog","Date",@currentTime,"Note",Concat("[CLOUDPAGE] DEBUG Endpoint: ", @historyEndpoint))
+      InsertDE("Dashboard_DailyLog","Date",@currentTime,"Note",Concat("[CLOUDPAGE] DEBUG Payload: ", Substring(@historyPayload,1,500)))
+
+      /* Estimate */
+      SET @estimateStatus = HTTPPost2(@estimateEndpoint, "application/json", @historyPayload, false, @estimateResponse, @estimateHeaders, @authHeaderName, @authHeaderValue, "x-direct-pipe", "true")
       IF @estimateStatus == 200 THEN
         SET @estimateCount = "0"
-        SET @countStartPos = IndexOf(@estimateResponse, Concat(@dq, "count", @dq))
-        IF @countStartPos > 0 THEN
-          SET @countSegment = Substring(@estimateResponse, Add(@countStartPos, 7), 50)
-          SET @countSegment = Trim(@countSegment)
-          IF IndexOf(@countSegment, ":") > 0 THEN
-            SET @countSegment = Substring(@countSegment, Add(IndexOf(@countSegment, ":"), 1), 50)
-            SET @countSegment = Trim(@countSegment)
-            SET @countEndPos = IndexOf(@countSegment, ",")
-            IF @countEndPos <= 0 THEN
-              SET @countEndPos = IndexOf(@countSegment, "}")
-            ENDIF
-            IF @countEndPos > 0 THEN
-              SET @estimateCount = Trim(Substring(@countSegment, 1, Subtract(@countEndPos, 1)))
-            ELSE
-              SET @estimateCount = @countSegment
-            ENDIF
+        SET @countMarker = '"rowCount":'
+        SET @countStart  = IndexOf(@estimateResponse, @countMarker)
+        IF @countStart > 0 THEN
+          SET @countStart = Add(@countStart, Length(@countMarker))
+          SET @countEnd   = IndexOf(@estimateResponse, ",", @countStart)
+          IF @countEnd <= @countStart THEN
+            SET @countEnd = IndexOf(@estimateResponse, "}", @countStart)
+          ENDIF
+          IF @countEnd > @countStart THEN
+            SET @estimateCount = Trim(Substring(@estimateResponse, @countStart, Subtract(@countEnd, @countStart)))
           ENDIF
         ENDIF
+        IF Empty(@estimateCount) THEN SET @estimateCount = "0" ENDIF
         InsertDE("Dashboard_DailyLog","Date",@currentTime,"Note",Concat("[CLOUDPAGE] DEBUG Estimate count=", @estimateCount))
       ELSE
+        SET @estimateCount = "-"
         InsertDE("Dashboard_DailyLog","Date",@currentTime,"Note",Concat("[CLOUDPAGE] DEBUG Estimate failed status=", @estimateStatus, " body=", Substring(@estimateResponse,1,250)))
       ENDIF
-      /* Call download endpoint (only needs Authorization header) */
-      HTTPHeader("Authorization", @authHeader)
-      HTTPHeader("x-direct-pipe", "true")
-      SET @historyStatus = HTTPPost(@historyEndpoint, "application/json", @historyPayload, @historyResponse)
+
+      /* Download */
+      SET @historyStatus = HTTPPost2(@historyEndpoint, "application/json", @historyPayload, false, @historyResponse, @historyHeaders, @authHeaderName, @authHeaderValue, "x-direct-pipe", "true")
       InsertDE("Dashboard_DailyLog","Date",@currentTime,"Note",Concat("[CLOUDPAGE] API Status: ", @historyStatus))
       InsertDE("Dashboard_DailyLog","Date",@currentTime,"Note",Concat("[CLOUDPAGE] API Response: ", Substring(@historyResponse,1,500)))
+
       IF @historyStatus == 200 THEN
-        /* Parse CSV lines and count valid entry events */
-        SET @entryCount = 0
-        SET @parsedRows = 0
-        SET @debugLogged = 0
-        SET @lineRows = BuildRowsetFromString(@historyResponse, Char(10))
-        SET @lineCount = RowCount(@lineRows)
+        SET @entryCount   = 0
+        SET @parsedRows   = 0
+        SET @debugLogged  = 0
+        SET @lineRows     = BuildRowsetFromString(@historyResponse, Char(10))
+        SET @lineCount    = RowCount(@lineRows)
+
         IF @lineCount > 1 THEN
           FOR @lineIndex = 2 TO @lineCount DO
             SET @line = Trim(Replace(Field(Row(@lineRows, @lineIndex), "Field1"), Char(13), ""))
             IF NOT Empty(@line) THEN
-              SET @normalizedLine = @line
-              IF IndexOf(@normalizedLine, Concat(@dq, @dq)) > 0 THEN
-                SET @normalizedLine = Replace(@normalizedLine, Concat(@dq, @dq), @dq)
-              ENDIF
-              IF IndexOf(@normalizedLine, Concat(@dq, ",", @dq)) > 0 THEN
-                IF Substring(@normalizedLine, 1, 1) == @dq THEN
-                  IF Length(@normalizedLine) > 1 THEN
-                    SET @normalizedLine = Substring(@normalizedLine, 2, Subtract(Length(@normalizedLine), 2))
-                  ENDIF
+              IF Substring(@line, 1, 1) == '"' THEN
+                IF Substring(@line, Length(@line), 1) == '"' THEN
+                  SET @line = Substring(@line, 2, Subtract(Length(@line), 2))
                 ENDIF
-                SET @columnRows = BuildRowsetFromString(@normalizedLine, Concat(@dq, ",", @dq))
+                SET @columnRows = BuildRowsetFromString(@line, Concat(Char(34), ",", Char(34)))
               ELSE
-                SET @columnRows = BuildRowsetFromString(@normalizedLine, ",")
+                SET @columnRows = BuildRowsetFromString(@line, ',')
               ENDIF
+
               SET @columnCount = RowCount(@columnRows)
               IF @columnCount >= 8 THEN
-                SET @statusValue = Lowercase(Trim(Replace(Field(Row(@columnRows, 3), "Field1"), @dq, "")))
-                SET @activityTypeValue = Lowercase(Trim(Replace(Field(Row(@columnRows, 8), "Field1"), @dq, "")))
+                SET @statusValue = Lowercase(Trim(Replace(Field(Row(@columnRows, 3), "Field1"), '"', '')))
+                SET @activityTypeValue = Lowercase(Trim(Replace(Field(Row(@columnRows, 8), "Field1"), '"', '')))
                 SET @parsedRows = Add(@parsedRows, 1)
-                IF @debugLogged < @debugSampleLimit THEN
+
+                IF @debugLogged < @debugLimit THEN
                   InsertDE("Dashboard_DailyLog","Date",@currentTime,"Note",Concat("[CLOUDPAGE] DEBUG Row Status=", @statusValue, " ActivityType=", @activityTypeValue))
                   SET @debugLogged = Add(@debugLogged, 1)
                 ENDIF
+
                 IF ( @statusValue == "complete" OR @statusValue == "completed" ) AND
                    ( @activityTypeValue == "trigger" OR @activityTypeValue == "journeyentryevent" OR @activityTypeValue == "entryevent" OR @activityTypeValue == "entry" ) THEN
                   SET @entryCount = Add(@entryCount, 1)
@@ -198,31 +189,33 @@ IF NOT Empty(@accessToken) THEN
             ENDIF
           NEXT @lineIndex
         ENDIF
-        /* Persist */
-        UpsertDE("Dashboard_JourneyDailyEntries", 2,
-          "JourneyID", @journeyId,
-          "Date",      @yesterday,
+
+        InsertDE("Dashboard_JourneyDailyEntries",
+          "JourneyID",    @journeyId,
+          "Date",         @yesterday,
           "DailyEntries", @entryCount
         )
+
         InsertDE("Dashboard_DailyLog","Date",@currentTime,"Note",Concat("[CLOUDPAGE] ✓ SUCCESS: ", @entryCount, " entries recorded"))
         InsertDE("Dashboard_DailyLog","Date",@currentTime,"Note",Concat("[CLOUDPAGE] DEBUG Parsed Rows=", @parsedRows, " Counted Entries=", @entryCount))
+
         SET @journeySummary = Concat(@journeyName, " (", @journeyId, ") : ", @entryCount, " entries | Rows parsed: ", @parsedRows)
         IF NOT Empty(@estimateCount) THEN
           SET @journeySummary = Concat(@journeySummary, " | Estimate: ", @estimateCount)
         ENDIF
-        SET @responseSummary = Concat(@responseSummary, @journeySummary, @newline)
+        SET @responseSummary = Concat(@responseSummary, @journeySummary, Char(10))
       ELSEIF @historyStatus == 401 THEN
         InsertDE("Dashboard_DailyLog","Date",@currentTime,"Note","[CLOUDPAGE] ✗ 401 Unauthorized - Token/scopes")
         SET @journeySummary = Concat(@journeyName, " (", @journeyId, ") : AUTH 401")
-        SET @responseSummary = Concat(@responseSummary, @journeySummary, @newline)
+        SET @responseSummary = Concat(@responseSummary, @journeySummary, Char(10))
       ELSEIF @historyStatus == 403 THEN
         InsertDE("Dashboard_DailyLog","Date",@currentTime,"Note","[CLOUDPAGE] ✗ 403 Forbidden - Missing Journey History permission")
         SET @journeySummary = Concat(@journeyName, " (", @journeyId, ") : AUTH 403")
-        SET @responseSummary = Concat(@responseSummary, @journeySummary, @newline)
+        SET @responseSummary = Concat(@responseSummary, @journeySummary, Char(10))
       ELSE
         InsertDE("Dashboard_DailyLog","Date",@currentTime,"Note",Concat("[CLOUDPAGE] ✗ ERROR: API returned status ", @historyStatus))
         SET @journeySummary = Concat(@journeyName, " (", @journeyId, ") : API error ", @historyStatus)
-        SET @responseSummary = Concat(@responseSummary, @journeySummary, @newline)
+        SET @responseSummary = Concat(@responseSummary, @journeySummary, Char(10))
       ENDIF
     NEXT @i
   ELSE
@@ -233,10 +226,13 @@ ELSE
   InsertDE("Dashboard_DailyLog","Date",@currentTime,"Note","[CLOUDPAGE] ✗ FATAL: No access token available - cannot proceed")
   SET @responseSummary = "Authentication failed."
 ENDIF
+
 InsertDE("Dashboard_DailyLog","Date",@currentTime,"Note","[CLOUDPAGE] === Collection Process Complete ===")
+
 IF Empty(@responseSummary) THEN
   SET @responseSummary = "Journey history download completed. No rows returned by API."
 ENDIF
-SET @escapedSummary = Replace(Replace(@responseSummary,"&","&amp;"),"<","&lt;")
+
+SET @escapedSummary = Replace(Replace(@responseSummary, "&", "&amp;"), "<", "&lt;")
 OutputLine(Concat("<html><body><pre>", @escapedSummary, "</pre></body></html>"))
 ]%%
