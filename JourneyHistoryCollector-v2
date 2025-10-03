@@ -6,6 +6,8 @@
    
 VAR @clientId, @clientSecret, @authUrl, @restBaseUrl
 VAR @accessToken, @authPayload, @authResponse, @authStatus
+VAR @accountId
+VAR @tokenStart, @tokenEnd, @tokenMarker
 VAR @currentTime, @yesterday, @yesterdayStart, @yesterdayEnd
 VAR @configRows, @rowCount, @i, @journeyId, @journeyName
 VAR @journeyInstanceId
@@ -32,13 +34,23 @@ InsertDE("Dashboard_DailyLog","Date",@currentTime,"Note",Concat("[CLOUDPAGE] Tar
 /* === OAuth === */
 SET @authPayload = Concat('{"grant_type":"client_credentials","client_id":"', @clientId, '","client_secret":"', @clientSecret,'","account_id":"', @accountId, '"}')
 SET @authStatus  = HTTPPost(@authUrl, "application/json", @authPayload, @authResponse)
+SET @accessToken = ""
 IF @authStatus == 200 THEN
-  VAR @tokenStart, @tokenEnd
-  SET @tokenStart  = Add(IndexOf(@authResponse,'":"'), 3)
-  SET @tokenEnd    = IndexOf(@authResponse, '"', @tokenStart)
-  SET @accessToken = Substring(@authResponse, @tokenStart, "512")
-  InsertDE("Dashboard_DailyLog","Date",@currentTime,"Note",Concat("[CLOUDPAGE] ✓ Token obtained. Length: ", Length(@accessToken)))
-  InsertDE("Dashboard_DailyLog","Date",@currentTime,"Note","[CLOUDPAGE] Token response received and sanitized for logging")
+  SET @tokenMarker = '"access_token":"'
+  SET @tokenStart = IndexOf(@authResponse, @tokenMarker)
+  IF @tokenStart > 0 THEN
+    SET @tokenStart = Add(@tokenStart, Length(@tokenMarker))
+    SET @tokenEnd   = IndexOf(@authResponse, '"', @tokenStart)
+    IF @tokenEnd > @tokenStart THEN
+      SET @accessToken = Substring(@authResponse, @tokenStart, Subtract(@tokenEnd, @tokenStart))
+    ENDIF
+  ENDIF
+  IF NOT Empty(@accessToken) THEN
+    InsertDE("Dashboard_DailyLog","Date",@currentTime,"Note",Concat("[CLOUDPAGE] ✓ Token obtained. Length: ", Length(@accessToken)))
+    InsertDE("Dashboard_DailyLog","Date",@currentTime,"Note","[CLOUDPAGE] Token response received and sanitized for logging")
+  ELSE
+    InsertDE("Dashboard_DailyLog","Date",@currentTime,"Note","[CLOUDPAGE] ✗ AUTH PARSE FAILED - access_token missing in response")
+  ENDIF
 ELSE
   InsertDE("Dashboard_DailyLog","Date",@currentTime,"Note",Concat("[CLOUDPAGE] ✗ AUTH FAILED. Status ", @authStatus, " Response: ", Substring(@authResponse,1,500)))
 ENDIF
