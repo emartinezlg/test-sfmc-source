@@ -1,0 +1,149 @@
+%%[
+/* ============================================================
+   Journey History Collector (Daily Entry Count via ESTIMATE)
+   - AMPscript only (OAuth: HTTPPost, API: HTTPPost2 for Bearer)
+   - Writes to DE: Dashboard_JourneyDailyEntries
+     Fields: DailyEntries (Number), Date (Date), JourneyID (Text 50)
+   - Counts "entries" = Journey Entry Event completes
+   ============================================================ */
+
+/* ---------- Config ---------- */
+VAR @clientId, @clientSecret, @accountId
+VAR @authUrl, @restBaseUrl
+
+/*  >>> Fill these with your values <<< */
+SET @clientId     = "c6hbg0vskfdflfwef87nszlo"
+SET @clientSecret = "bGF8p8QTtlEKcAK7aJANlY2v"
+SET @accountId    = "100013802"
+SET @authUrl      = "https://mcps4dq7y851bybsng90p082fjq0.auth.marketingcloudapis.com/v2/token"
+SET @restBaseUrl  = "https://mcps4dq7y851bybsng90p082fjq0.rest.marketingcloudapis.com"
+
+/* ---------- Time window (UTC yesterday) ----------
+   Now() returns system CST with no DST. Convert to UTC by +6h,
+   then take the previous calendar day in UTC. */
+VAR @systemNow, @utcNow, @yesterdayUTC, @yesterdayDateOnly
+VAR @startIso, @endIso
+
+SET @systemNow = Now()
+SET @utcNow = DateAdd(@systemNow, 6, "H")
+SET @yesterdayUTC = DateAdd(@utcNow, -1, "D")
+SET @yesterdayDateOnly = FormatDate(@yesterdayUTC, "yyyy-MM-dd")
+SET @startIso = Concat(@yesterdayDateOnly, "T00:00:00Z")
+SET @endIso   = Concat(@yesterdayDateOnly, "T23:59:59Z")
+
+/* ---------- OAuth ---------- */
+VAR @authPayload, @authResponse, @authStatus, @accessToken
+SET @authPayload = Concat(
+  '{"grant_type":"client_credentials","client_id":"', @clientId,
+  '","client_secret":"', @clientSecret,
+  '","account_id":"', @accountId, '"}'
+)
+SET @authStatus = HTTPPost(@authUrl, "application/json", @authPayload, @authResponse)
+
+IF @authStatus == 200 THEN
+  /* Robustly extract "access_token":"...". */
+  VAR @needle, @s, @e, @lenNeedle
+  SET @needle = '"access_token":"'
+  SET @lenNeedle = Length(@needle)
+  SET @s = IndexOf(@authResponse, @needle)
+  IF @s > 0 THEN
+    SET @s = Add(@s, @lenNeedle)
+    SET @e = IndexOf(@authResponse, '"', @s)
+    IF @e > @s THEN
+      SET @accessToken = Substring(@authResponse, @s, Subtract(@e, @s))
+    ENDIF
+  ENDIF
+ENDIF
+
+IF Empty(@accessToken) THEN
+  /* Optional: log to your Dashboard_DailyLog if desired */
+  /* InsertDE("Dashboard_DailyLog","Date",@utcNow,"Note",Concat("[CLOUDPAGE] Auth failed. Status ", @authStatus, " Resp ", Substring(@authResponse,1,250))) */
+  GOTO endall
+ENDIF
+
+/* ---------- Load Journeys to process ---------- */
+VAR @configRows, @rowCount
+SET @configRows = LookupRows("Dashboard_JourneyConfig","Active","1")
+SET @rowCount   = RowCount(@configRows)
+
+/* Optional: log start */
+/* InsertDE("Dashboard_DailyLog","Date",@utcNow,"Note",Concat("[CLOUDPAGE] Collecting entries for ", @yesterdayDateOnly, " / Journeys: ", @rowCount)) */
+
+IF @rowCount > 0 THEN
+
+  VAR @i, @row, @journeyId, @estimateEndpoint, @authHeader
+  VAR @estimatePayload, @status, @body
+  VAR @k, @s2, @e2, @rowCountStr, @estimatedCount
+
+  SET @estimateEndpoint = Concat(@restBaseUrl, "/interaction/v1/interactions/journeyhistory/estimate")
+  SET @authHeader = Concat("Bearer ", @accessToken)
+
+  FOR @i = 1 TO @rowCount DO
+
+    SET @row = Row(@configRows, @i)
+    SET @journeyId = Field(@row, "JourneyID")
+
+    /* Build payload to count actual entries:
+       activityTypes:["trigger"] + statuses:["Complete"] */
+    SET @estimatePayload = Concat(
+      '{',
+        '"definitionIds":["', @journeyId, '"],',
+        '"start":"', @startIso, '",',
+        '"end":"',   @endIso,   '",',
+        '"activityTypes":["trigger"],',
+        '"statuses":["Complete"]',
+      '}'
+    )
+
+    /* Call ESTIMATE (needs Authorization header => HTTPPost2) */
+    SET @status = HTTPPost2(
+      @estimateEndpoint, "application/json", @estimatePayload, /*hasError*/ false,
+      @body, @dummyRowset,
+      "Authorization", @authHeader
+    )
+
+    /* Default to 0 in case of issues */
+    SET @estimatedCount = "0"
+
+    IF @status == 200 THEN
+      /* Parse "rowCount":<n> */
+      SET @k = '"rowCount":'
+      SET @s2 = IndexOf(@body, @k)
+      IF @s2 > 0 THEN
+        SET @s2 = Add(@s2, Length(@k))
+        /* rowCount ends at first comma or closing brace after @s2 */
+        SET @e2 = IndexOf(@body, ",", @s2)
+        IF @e2 < @s2 THEN SET @e2 = IndexOf(@body, "}", @s2) ENDIF
+        IF @e2 > @s2 THEN
+          SET @rowCountStr = Trim(Substring(@body, @s2, Subtract(@e2, @s2)))
+          /* sanitize */
+          SET @rowCountStr = Replace(@rowCountStr,'"','')
+          SET @rowCountStr = Replace(@rowCountStr,' ','')
+          IF NOT Empty(@rowCountStr) THEN SET @estimatedCount = @rowCountStr ENDIF
+        ENDIF
+      ENDIF
+    ELSEIF @status == 401 THEN
+      /* Optional log: unauthorized/scopes */
+      /* InsertDE("Dashboard_DailyLog","Date",@utcNow,"Note",Concat("[CLOUDPAGE] 401 Unauthorized for Journey ", @journeyId)) */
+    ELSEIF @status == 403 THEN
+      /* Optional log: permission missing */
+      /* InsertDE("Dashboard_DailyLog","Date",@utcNow,"Note",Concat("[CLOUDPAGE] 403 Forbidden (Journey History permission) for Journey ", @journeyId)) */
+    ELSE
+      /* Optional log generic */
+      /* InsertDE("Dashboard_DailyLog","Date",@utcNow,"Note",Concat("[CLOUDPAGE] Estimate error ", @status, " for Journey ", @journeyId, " Body: ", Substring(@body,1,250))) */
+    ENDIF
+
+    /* Upsert daily count for (JourneyID, Date) */
+    UpsertDE("Dashboard_JourneyDailyEntries", 2,
+      "JourneyID", @journeyId,
+      "Date",      @yesterdayDateOnly,
+      "DailyEntries", @estimatedCount
+    )
+
+  NEXT @i
+ENDIF
+
+LABEL endall:
+/* Optional: log completion */
+/* InsertDE("Dashboard_DailyLog","Date",@utcNow,"Note","[CLOUDPAGE] Collection complete") */
+]%%
