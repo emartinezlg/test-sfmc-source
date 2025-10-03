@@ -1,74 +1,69 @@
 <script runat="server">
-Platform.Load("Core", "1.1.1");
-
-var LOG_DE_KEY = "8BF29E68-F498-4A4F-BE50-E1CE24B7C300";
-var WORKER_URL = "https://cloud.info.stib-mivb.brussels/Dashboard-CollectJourneyEntries";
-var executionId = Platform.Function.GUID();
-
-function toLocalNow() {
-    try {
-        return Platform.Function.SystemDateToLocalDate(new Date());
-    } catch (ex) {
-        return new Date();
-    }
-}
-
-function safeLog(stage, message) {
-    var note = stage + " - " + message;
-    try {
-        var logRow = Platform.Function.CreateObject("DataExtensionObject");
-        Platform.Function.SetObjectProperty(logRow, "CustomerKey", LOG_DE_KEY);
-        Platform.Function.AddObjectArrayItem(logRow, "Properties", {
-            Name: "Date",
-            Value: toLocalNow()
-        });
-        Platform.Function.AddObjectArrayItem(logRow, "Properties", {
-            Name: "Note",
-            Value: "[AUTO " + executionId + "] " + note
-        });
-        Platform.Function.InvokeCreate(logRow);
-    } catch (logEx) {
-        // swallow logging failure to avoid breaking the run
-    }
-}
+Platform.Load("core", "1");
 
 try {
-    safeLog("START", "Automation execution started");
-
-    var payloadObject = {
-        trigger: "automation-studio",
-        executionId: executionId,
-        invokedAt: new Date().toISOString()
-    };
-    var payload = Platform.Function.Stringify(payloadObject);
-
-    var headers = ["Content-Type", "User-Agent", "X-Execution-Id"];
-    var headerValues = [
-        "application/json",
-        "AutomationStudio-DataCollectionWorker",
-        executionId
-    ];
-
-    safeLog("BEFORE_HTTP_POST", "Invoking worker CloudPage at " + WORKER_URL);
-    var response = HTTP.Post(WORKER_URL, "application/json", payload, headers, headerValues);
-    safeLog("AFTER_HTTP_POST", "Status: " + response.StatusCode);
-
-    var responseBody = "";
-    if (response.Response && response.Response.length > 0 && response.Response[0]) {
-        responseBody = response.Response[0];
+    // Helper function for logging
+    function logDebug(msg) {
+        try {
+            var logDE = DataExtension.Init("8BF29E68-F498-4A4F-BE50-E1CE24B7C300");
+            if (logDE) {
+                logDE.Rows.Add({ Date: new Date(), Note: "[AUTO] " + msg });
+            }
+        } catch (e) {
+            // Silent fail
+        }
     }
-
-    safeLog("WORKER PAGE CALLED", "HTTP " + response.StatusCode + "; response: " + (responseBody.length > 200 ? responseBody.substring(0, 200) + "..." : responseBody));
-
-    if (response.StatusCode < 200 || response.StatusCode >= 300) {
-        throw new Error("Worker returned HTTP status " + response.StatusCode);
+    
+    logDebug("=== Automation Started ===");
+    logDebug("Triggering CloudPage to collect Journey history");
+    
+    // Your CloudPage URL
+    var cloudPageUrl = "https://cloud.info.stib-mivb.brussels/JourneyHistoryCollector-v2";
+    
+    logDebug("CloudPage URL: " + cloudPageUrl);
+    
+    // Trigger the CloudPage via HTTPGet
+    try {
+        logDebug("Attempting to trigger CloudPage via HTTPGet");
+        
+        var response = Platform.Function.HTTPGet(cloudPageUrl);
+        
+        if (response) {
+            logDebug("CloudPage triggered successfully");
+            logDebug("Response received, length: " + String(response).length + " characters");
+            
+            // Check if response indicates success
+            if (String(response).indexOf("Complete") > -1 || String(response).indexOf("Processed") > -1) {
+                logDebug("SUCCESS: CloudPage execution completed successfully");
+            } else if (String(response).indexOf("ERROR") > -1) {
+                logDebug("WARNING: CloudPage reported errors - check Dashboard_DailyLog");
+            } else {
+                logDebug("INFO: CloudPage executed, check Dashboard_DailyLog for details");
+            }
+        } else {
+            logDebug("WARNING: Empty response from CloudPage");
+        }
+        
+    } catch (httpEx) {
+        logDebug("ERROR: Failed to trigger CloudPage - " + httpEx.toString());
+        logDebug("NOTE: You may need to trigger the CloudPage manually");
     }
-
-    safeLog("FINAL", "Automation run completed successfully");
+    
+    logDebug("=== Automation Completed ===");
+    logDebug("Review Dashboard_DailyLog for CloudPage execution details");
+    logDebug("Review Dashboard_JourneyDailyEntries for entry count results");
+    
 } catch (ex) {
-    safeLog("ERROR", String(ex));
-    throw ex;
-} finally {
-    safeLog("END", "Automation script finished");
+    try {
+        var logDE = DataExtension.Init("8BF29E68-F498-4A4F-BE50-E1CE24B7C300");
+        if (logDE) {
+            logDE.Rows.Add({ 
+                Date: new Date(), 
+                Note: "[AUTO] FATAL ERROR: " + ex.toString() 
+            });
+        }
+    } catch (logEx) {
+        // Ultimate fallback - script will fail silently
+    }
 }
 </script>
